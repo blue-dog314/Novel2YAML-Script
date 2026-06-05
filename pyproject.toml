@@ -1,0 +1,67 @@
+[project]
+name = "novel-to-screenplay"
+version = "0.1.0"
+description = "AI-assisted novel-to-screenplay MVP - workspace root"
+requires-python = ">=3.12"
+dependencies = [
+    "shared-types",
+    "screenplay-schema",
+    "validators",
+    "generation",
+    "exporters",
+    "api",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+shared-types = { workspace = true }
+screenplay-schema = { workspace = true }
+validators = { workspace = true }
+generation = { workspace = true }
+exporters = { workspace = true }
+api = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+    "packages/shared_types",
+    "packages/screenplay_schema",
+    "packages/validators",
+    "packages/generation",
+    "packages/exporters",
+    "apps/api",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.10",
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+    "packages/shared_types",
+    "packages/screenplay_schema",
+    "packages/validators",
+    "packages/generation",
+    "packages/exporters",
+    "apps/api",
+]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = [
+    "packages/shared_types/src",
+    "packages/screenplay_schema/src",
+    "packages/validators/src",
+    "packages/generation/src",
+    "packages/exporters/src",
+    "apps/api/src",
+    "tests",
+]

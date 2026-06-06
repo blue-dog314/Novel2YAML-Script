@@ -15,6 +15,7 @@ from shared_types import (
 )
 from validators import validate_document
 
+from .artifacts import GenerationArtifacts
 from .assembly import assemble_screenplay
 from .chapter_summary import summarize_chapters
 from .inputs import ChapterInput
@@ -27,8 +28,13 @@ from .scene_writer import write_scene
 class PipelineFailure(Exception):
     """Exception wrapper carrying the public PipelineError contract."""
 
-    def __init__(self, error: PipelineError) -> None:
+    def __init__(
+        self,
+        error: PipelineError,
+        artifacts: GenerationArtifacts | None = None,
+    ) -> None:
         self.error = error
+        self.artifacts = artifacts
         super().__init__(error.error_message)
 
 
@@ -42,48 +48,103 @@ def generate_screenplay(
     model: str,
     llm: LLMClient,
     adaptation_config: AdaptationConfig | None = None,
+    resume_from: GenerationArtifacts | None = None,
 ) -> ScreenplayDraftDocument:
-    """Run staged generation through assembly, validation, export, and re-parse."""
-    completed_artifacts: list[str] = []
+    """Run staged generation and return the validated draft document."""
+    document, _ = generate_screenplay_with_artifacts(
+        chapters=chapters,
+        project_id=project_id,
+        title=title,
+        original_author=original_author,
+        language=language,
+        model=model,
+        llm=llm,
+        adaptation_config=adaptation_config,
+        resume_from=resume_from,
+    )
+    return document
+
+
+def generate_screenplay_with_artifacts(
+    *,
+    chapters: list[ChapterInput],
+    project_id: str,
+    title: str,
+    original_author: str,
+    language: str,
+    model: str,
+    llm: LLMClient,
+    adaptation_config: AdaptationConfig | None = None,
+    resume_from: GenerationArtifacts | None = None,
+) -> tuple[ScreenplayDraftDocument, GenerationArtifacts]:
+    """Run staged generation, returning the document and completed artifacts.
+
+    Stages whose output is already present in ``resume_from`` are skipped and
+    do not call the LLM. Deterministic, cheap steps (assembly, validation, and
+    export revalidation) always run.
+    """
     if len(chapters) < 3:
         _raise_pipeline_failure(
             failed_stage="chapter_parsing",
             error_type="chapter_count_insufficient",
             error_message="At least three confirmed chapters are required.",
             retryable=False,
-            completed_artifacts=completed_artifacts,
+            artifacts=GenerationArtifacts(),
             suggested_action="Provide three or more confirmed chapters before generation.",
         )
 
-    try:
-        chapter_summaries = summarize_chapters(chapters, llm)
-    except ModelOutputInvalid as exc:
-        _raise_model_output_failure(exc, completed_artifacts)
-    except Exception as exc:
-        _raise_unexpected_stage_failure("summarizing", exc, completed_artifacts)
-    completed_artifacts.append("chapter_summaries")
-
-    try:
-        scene_plan = plan_scenes(chapter_summaries, llm)
-    except ModelOutputInvalid as exc:
-        _raise_model_output_failure(exc, completed_artifacts)
-    except Exception as exc:
-        _raise_unexpected_stage_failure("scene_planning", exc, completed_artifacts)
-    completed_artifacts.append("scene_plan")
-
-    scene_contents = []
-    for index, plan_item in enumerate(scene_plan.scenes, start=1):
+    if resume_from is not None and resume_from.chapter_summaries is not None:
+        chapter_summaries = resume_from.chapter_summaries
+    else:
         try:
-            scene_contents.append(write_scene(_scene_id(index), plan_item, llm))
+            chapter_summaries = summarize_chapters(chapters, llm)
         except ModelOutputInvalid as exc:
-            _raise_model_output_failure(exc, completed_artifacts)
+            _raise_model_output_failure(exc, GenerationArtifacts())
+        except Exception as exc:
+            _raise_unexpected_stage_failure("summarizing", exc, GenerationArtifacts())
+
+    if resume_from is not None and resume_from.scene_plan is not None:
+        scene_plan = resume_from.scene_plan
+    else:
+        try:
+            scene_plan = plan_scenes(chapter_summaries, llm)
+        except ModelOutputInvalid as exc:
+            _raise_model_output_failure(
+                exc,
+                GenerationArtifacts(chapter_summaries=chapter_summaries),
+            )
         except Exception as exc:
             _raise_unexpected_stage_failure(
-                "scene_content_generation",
+                "scene_planning",
                 exc,
-                completed_artifacts,
+                GenerationArtifacts(chapter_summaries=chapter_summaries),
             )
-    completed_artifacts.append("scene_contents")
+
+    if resume_from is not None and resume_from.scene_contents is not None:
+        scene_contents = resume_from.scene_contents
+    else:
+        scene_contents = []
+        for index, plan_item in enumerate(scene_plan.scenes, start=1):
+            partial = GenerationArtifacts(
+                chapter_summaries=chapter_summaries,
+                scene_plan=scene_plan,
+            )
+            try:
+                scene_contents.append(write_scene(_scene_id(index), plan_item, llm))
+            except ModelOutputInvalid as exc:
+                _raise_model_output_failure(exc, partial)
+            except Exception as exc:
+                _raise_unexpected_stage_failure(
+                    "scene_content_generation",
+                    exc,
+                    partial,
+                )
+
+    artifacts = GenerationArtifacts(
+        chapter_summaries=chapter_summaries,
+        scene_plan=scene_plan,
+        scene_contents=scene_contents,
+    )
 
     try:
         document = assemble_screenplay(
@@ -103,10 +164,9 @@ def generate_screenplay(
             error_type="model_output_invalid",
             error_message=f"Assembly failed: {exc}",
             retryable=True,
-            completed_artifacts=completed_artifacts,
+            artifacts=artifacts,
             suggested_action="Regenerate the model outputs and try assembly again.",
         )
-    completed_artifacts.append("screenplay_draft")
 
     report = validate_document(document)
     if not _report_passed(report):
@@ -115,10 +175,10 @@ def generate_screenplay(
             error_type=_validation_error_type(report),
             error_message=_validation_error_message(report),
             retryable=True,
-            completed_artifacts=completed_artifacts,
+            artifacts=artifacts,
+            extra_labels=["screenplay_draft"],
             suggested_action="Regenerate or repair the staged outputs before export.",
         )
-    completed_artifacts.append("validation_report")
 
     try:
         export_validated_yaml(document)
@@ -128,12 +188,12 @@ def generate_screenplay(
             error_type="schema_validation_failed",
             error_message=f"Exported YAML failed revalidation: {exc}",
             retryable=False,
-            completed_artifacts=completed_artifacts,
+            artifacts=artifacts,
+            extra_labels=["screenplay_draft", "validation_report"],
             suggested_action="Inspect exporter and schema compatibility before retrying.",
         )
-    completed_artifacts.append("screenplay_yaml")
 
-    return document
+    return document, artifacts
 
 
 def _scene_id(index: int) -> str:
@@ -170,16 +230,34 @@ def _validation_error_message(report: ValidationReport) -> str:
     return "; ".join(issue_summaries)
 
 
+def _labels(artifacts: GenerationArtifacts) -> list[str]:
+    """Derive the public completed-artifact labels from the typed container.
+
+    Mirrors the historical append order: a stage label is present only when
+    that stage fully completed (its artifact field is non-``None``). The
+    ``scene_contents`` label therefore appears only when every scene was
+    written, matching the prior behaviour.
+    """
+    labels: list[str] = []
+    if artifacts.chapter_summaries is not None:
+        labels.append("chapter_summaries")
+    if artifacts.scene_plan is not None:
+        labels.append("scene_plan")
+    if artifacts.scene_contents is not None:
+        labels.append("scene_contents")
+    return labels
+
+
 def _raise_model_output_failure(
     exc: ModelOutputInvalid,
-    completed_artifacts: list[str],
+    artifacts: GenerationArtifacts,
 ) -> NoReturn:
     _raise_pipeline_failure(
         failed_stage=exc.stage,
         error_type=exc.error_type,
         error_message=exc.error_message,
         retryable=True,
-        completed_artifacts=completed_artifacts,
+        artifacts=artifacts,
         suggested_action="Regenerate the failed stage output; automatic repair has already been tried once.",
     )
 
@@ -187,14 +265,14 @@ def _raise_model_output_failure(
 def _raise_unexpected_stage_failure(
     failed_stage: PipelineStage,
     exc: Exception,
-    completed_artifacts: list[str],
+    artifacts: GenerationArtifacts,
 ) -> NoReturn:
     _raise_pipeline_failure(
         failed_stage=failed_stage,
         error_type="model_output_invalid",
         error_message=f"{failed_stage} failed: {exc}",
         retryable=True,
-        completed_artifacts=completed_artifacts,
+        artifacts=artifacts,
         suggested_action="Retry the failed generation stage with fresh model output.",
     )
 
@@ -205,23 +283,30 @@ def _raise_pipeline_failure(
     error_type: PipelineErrorType,
     error_message: str,
     retryable: bool,
-    completed_artifacts: list[str],
+    artifacts: GenerationArtifacts,
     suggested_action: str,
+    extra_labels: list[str] | None = None,
 ) -> NoReturn:
+    completed_artifacts = _labels(artifacts)
+    if extra_labels:
+        completed_artifacts.extend(extra_labels)
     raise PipelineFailure(
         PipelineError(
             failed_stage=failed_stage,
             error_type=error_type,
             error_message=error_message,
             retryable=retryable,
-            completed_artifacts=list(completed_artifacts),
+            completed_artifacts=completed_artifacts,
             suggested_action=suggested_action,
-        )
+        ),
+        artifacts,
     )
 
 
 __all__ = [
     "ChapterInput",
+    "GenerationArtifacts",
     "PipelineFailure",
     "generate_screenplay",
+    "generate_screenplay_with_artifacts",
 ]

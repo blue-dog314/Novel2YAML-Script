@@ -24,6 +24,7 @@ EXPECTED_TOP_LEVEL_PROPERTIES = [
     "locations",
     "screenplay",
     "timeline",
+    "story_bible",
     "adaptation_changes",
     "validation",
     "revision_notes",

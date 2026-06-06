@@ -249,6 +249,66 @@ def _validate_references(document: ScreenplayDraftDocument) -> list[ValidationEr
                     )
                 )
 
+    story_bible_character_ids = [
+        profile.character_id for profile in document.story_bible.characters
+    ]
+    errors.extend(
+        _duplicate_issues(
+            story_bible_character_ids,
+            "DUPLICATE_STORY_BIBLE_CHARACTER",
+            "story_bible.characters",
+        )
+    )
+    for character_profile_index, character_profile in enumerate(document.story_bible.characters):
+        character_profile_path = f"story_bible.characters[{character_profile_index}]"
+        if character_profile.character_id not in character_ids:
+            errors.append(
+                _issue(
+                    "UNKNOWN_STORY_BIBLE_CHARACTER",
+                    f"story bible references unknown character {character_profile.character_id!r}",
+                    f"{character_profile_path}.character_id",
+                )
+            )
+        for scene_id in character_profile.scene_ids:
+            if scene_id not in valid_scene_ids:
+                errors.append(
+                    _issue(
+                        "UNKNOWN_STORY_BIBLE_SCENE",
+                        f"story bible references unknown scene {scene_id!r}",
+                        f"{character_profile_path}.scene_ids",
+                    )
+                )
+
+    story_bible_location_ids = [
+        profile.location_id for profile in document.story_bible.locations
+    ]
+    errors.extend(
+        _duplicate_issues(
+            story_bible_location_ids,
+            "DUPLICATE_STORY_BIBLE_LOCATION",
+            "story_bible.locations",
+        )
+    )
+    for location_profile_index, location_profile in enumerate(document.story_bible.locations):
+        location_profile_path = f"story_bible.locations[{location_profile_index}]"
+        if location_profile.location_id not in location_ids:
+            errors.append(
+                _issue(
+                    "UNKNOWN_STORY_BIBLE_LOCATION",
+                    f"story bible references unknown location {location_profile.location_id!r}",
+                    f"{location_profile_path}.location_id",
+                )
+            )
+        for scene_id in location_profile.scene_ids:
+            if scene_id not in valid_scene_ids:
+                errors.append(
+                    _issue(
+                        "UNKNOWN_STORY_BIBLE_SCENE",
+                        f"story bible references unknown scene {scene_id!r}",
+                        f"{location_profile_path}.scene_ids",
+                    )
+                )
+
     return errors
 
 

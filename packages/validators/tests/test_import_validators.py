@@ -10,14 +10,19 @@ from shared_types import (
     AdaptationChange,
     AdaptationConfig,
     Chapter,
+    Character,
+    CharacterProfile,
     DialogueBlock,
     EmbeddedValidation,
     KeyEvent,
+    Location,
+    LocationProfile,
     Metadata,
     NoteBlock,
     Scene,
     Screenplay,
     ScreenplayDraftDocument,
+    StoryBible,
     TimelineEntry,
     ValidatedScreenplay,
 )
@@ -468,3 +473,90 @@ def test_duplicate_timeline_entry_id_fails_reference_validation() -> None:
     report = validate_document(_draft(timeline=timeline))
     assert report.reference_validation_passed is False
     assert any(error.code == "DUPLICATE_TIMELINE_ENTRY_ID" for error in report.errors)
+
+
+def test_valid_story_bible_passes_reference_validation() -> None:
+    story_bible = StoryBible(
+        characters=[CharacterProfile(character_id="char-1", name="Alice", scene_ids=["sc-1"])],
+        locations=[LocationProfile(location_id="loc-1", name="Courtyard", scene_ids=["sc-1"])],
+    )
+    report = validate_document(
+        _draft(
+            characters=[Character(character_id="char-1", name="Alice")],
+            locations=[Location(location_id="loc-1", name="Courtyard")],
+            story_bible=story_bible,
+        )
+    )
+    assert report.reference_validation_passed is True
+    assert report.errors == []
+
+
+def test_empty_story_bible_passes_reference_validation() -> None:
+    report = validate_document(_draft())
+    assert report.reference_validation_passed is True
+
+
+def test_unknown_story_bible_character_fails_reference_validation() -> None:
+    story_bible = StoryBible(
+        characters=[CharacterProfile(character_id="char-missing", name="Ghost", scene_ids=["sc-1"])],
+    )
+    report = validate_document(_draft(story_bible=story_bible))
+    assert report.reference_validation_passed is False
+    assert any(error.code == "UNKNOWN_STORY_BIBLE_CHARACTER" for error in report.errors)
+
+
+def test_unknown_story_bible_location_fails_reference_validation() -> None:
+    story_bible = StoryBible(
+        locations=[LocationProfile(location_id="loc-missing", name="Nowhere", scene_ids=["sc-1"])],
+    )
+    report = validate_document(_draft(story_bible=story_bible))
+    assert report.reference_validation_passed is False
+    assert any(error.code == "UNKNOWN_STORY_BIBLE_LOCATION" for error in report.errors)
+
+
+def test_unknown_story_bible_scene_fails_reference_validation() -> None:
+    story_bible = StoryBible(
+        characters=[CharacterProfile(character_id="char-1", name="Alice", scene_ids=["missing-scene"])],
+    )
+    report = validate_document(
+        _draft(
+            characters=[Character(character_id="char-1", name="Alice")],
+            story_bible=story_bible,
+        )
+    )
+    assert report.reference_validation_passed is False
+    assert any(error.code == "UNKNOWN_STORY_BIBLE_SCENE" for error in report.errors)
+
+
+def test_duplicate_story_bible_character_fails_reference_validation() -> None:
+    story_bible = StoryBible(
+        characters=[
+            CharacterProfile(character_id="char-1", name="Alice", scene_ids=["sc-1"]),
+            CharacterProfile(character_id="char-1", name="Alice", scene_ids=["sc-1"]),
+        ],
+    )
+    report = validate_document(
+        _draft(
+            characters=[Character(character_id="char-1", name="Alice")],
+            story_bible=story_bible,
+        )
+    )
+    assert report.reference_validation_passed is False
+    assert any(error.code == "DUPLICATE_STORY_BIBLE_CHARACTER" for error in report.errors)
+
+
+def test_duplicate_story_bible_location_fails_reference_validation() -> None:
+    story_bible = StoryBible(
+        locations=[
+            LocationProfile(location_id="loc-1", name="Courtyard", scene_ids=["sc-1"]),
+            LocationProfile(location_id="loc-1", name="Courtyard", scene_ids=["sc-1"]),
+        ],
+    )
+    report = validate_document(
+        _draft(
+            locations=[Location(location_id="loc-1", name="Courtyard")],
+            story_bible=story_bible,
+        )
+    )
+    assert report.reference_validation_passed is False
+    assert any(error.code == "DUPLICATE_STORY_BIBLE_LOCATION" for error in report.errors)

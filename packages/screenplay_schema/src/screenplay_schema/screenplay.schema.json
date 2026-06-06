@@ -248,6 +248,34 @@
       "title": "Character",
       "type": "object"
     },
+    "CharacterProfile": {
+      "additionalProperties": false,
+      "description": "Story-bible profile: a character and the scenes they appear in.\n\nBackend-derived from the assembled characters table and scene references;\nno new LLM stage. ``scene_ids`` lists scenes whose ``characters`` include\nthis character id, in scene order.",
+      "properties": {
+        "character_id": {
+          "title": "Character Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "scene_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Scene Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "character_id",
+        "name"
+      ],
+      "title": "CharacterProfile",
+      "type": "object"
+    },
     "DialogueBlock": {
       "additionalProperties": false,
       "description": "A line of dialogue. Carries both speaker id and display name.",
@@ -395,6 +423,34 @@
         "name"
       ],
       "title": "Location",
+      "type": "object"
+    },
+    "LocationProfile": {
+      "additionalProperties": false,
+      "description": "Story-bible profile: a location and the scenes set there.",
+      "properties": {
+        "location_id": {
+          "title": "Location Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "scene_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Scene Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "location_id",
+        "name"
+      ],
+      "title": "LocationProfile",
       "type": "object"
     },
     "Metadata": {
@@ -706,6 +762,30 @@
       "title": "Screenplay",
       "type": "object"
     },
+    "StoryBible": {
+      "additionalProperties": false,
+      "description": "Backend-derived overview aggregating characters and locations across scenes.\n\nMinimal P0a aggregation: it is computed deterministically from the\ncharacters/locations tables and the scenes that reference them. It owns no\nnew data the model produced.",
+      "properties": {
+        "characters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CharacterProfile"
+          },
+          "title": "Characters",
+          "type": "array"
+        },
+        "locations": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/LocationProfile"
+          },
+          "title": "Locations",
+          "type": "array"
+        }
+      },
+      "title": "StoryBible",
+      "type": "object"
+    },
     "TimelineEntry": {
       "additionalProperties": false,
       "description": "A single story-timeline entry.\n\nBackend-owned: the backend derives the timeline deterministically from\nchapter key events (it owns ``entry_id`` and the ``related_scenes`` link).\n``time`` is optional free text since P0a does not yet model absolute time.\n``source_chapters`` records provenance; ``related_scenes`` lists the scenes\nthat cover those chapters and is validated against known scene ids.",
@@ -830,6 +910,13 @@
       "title": "Timeline",
       "type": "array"
     },
+    "story_bible": {
+      "$ref": "#/$defs/StoryBible",
+      "default": {
+        "characters": [],
+        "locations": []
+      }
+    },
     "adaptation_changes": {
       "default": [],
       "items": {
@@ -860,5 +947,5 @@
   "type": "object",
   "$id": "novel-to-screenplay.screenplay.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "x-schema-version": "0.2.0"
+  "x-schema-version": "0.3.0"
 }

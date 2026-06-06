@@ -1,0 +1,808 @@
+{
+  "$defs": {
+    "ActionBlock": {
+      "additionalProperties": false,
+      "description": "An action / stage-direction block.",
+      "properties": {
+        "block_id": {
+          "title": "Block Id",
+          "type": "string"
+        },
+        "order": {
+          "title": "Order",
+          "type": "integer"
+        },
+        "type": {
+          "const": "action",
+          "default": "action",
+          "title": "Type",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "block_id",
+        "order",
+        "text"
+      ],
+      "title": "ActionBlock",
+      "type": "object"
+    },
+    "AdaptationChange": {
+      "additionalProperties": false,
+      "description": "An explicit record of a meaningful adaptation change.",
+      "properties": {
+        "change_id": {
+          "title": "Change Id",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "merged",
+            "omitted",
+            "added",
+            "reordered",
+            "compressed",
+            "expanded",
+            "changed_pov"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "source_chapters": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Chapters",
+          "type": "array"
+        },
+        "affected_scenes": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Affected Scenes",
+          "type": "array"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "change_id",
+        "type",
+        "description",
+        "reason"
+      ],
+      "title": "AdaptationChange",
+      "type": "object"
+    },
+    "AdaptationConfig": {
+      "additionalProperties": false,
+      "description": "User-chosen adaptation configuration.\n\nAll fields are optional. SKILL.md section 4 lists these as adaptation\n*config* options; a legal document need not fill every one. This matches the\nTS contract, where the same knobs are optional.",
+      "properties": {
+        "output_language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Language"
+        },
+        "target_medium": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Medium"
+        },
+        "episode_length_minutes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Episode Length Minutes"
+        },
+        "adaptation_degree": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adaptation Degree"
+        },
+        "narration_policy": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Narration Policy"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tone"
+        },
+        "dialogue_style": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dialogue Style"
+        },
+        "max_scene_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Scene Count"
+        }
+      },
+      "title": "AdaptationConfig",
+      "type": "object"
+    },
+    "Chapter": {
+      "additionalProperties": false,
+      "description": "A parsed, confirmed chapter with its summary and key events.",
+      "properties": {
+        "chapter_id": {
+          "title": "Chapter Id",
+          "type": "string"
+        },
+        "order": {
+          "title": "Order",
+          "type": "integer"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "key_events": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/KeyEvent"
+          },
+          "title": "Key Events",
+          "type": "array"
+        }
+      },
+      "required": [
+        "chapter_id",
+        "order",
+        "title",
+        "summary"
+      ],
+      "title": "Chapter",
+      "type": "object"
+    },
+    "Character": {
+      "additionalProperties": false,
+      "description": "A character. Minimal in P0a-lite-1; the table may be empty.",
+      "properties": {
+        "character_id": {
+          "title": "Character Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "character_id",
+        "name"
+      ],
+      "title": "Character",
+      "type": "object"
+    },
+    "DialogueBlock": {
+      "additionalProperties": false,
+      "description": "A line of dialogue. Carries both speaker id and display name.",
+      "properties": {
+        "block_id": {
+          "title": "Block Id",
+          "type": "string"
+        },
+        "order": {
+          "title": "Order",
+          "type": "integer"
+        },
+        "type": {
+          "const": "dialogue",
+          "default": "dialogue",
+          "title": "Type",
+          "type": "string"
+        },
+        "speaker": {
+          "title": "Speaker",
+          "type": "string"
+        },
+        "speaker_name": {
+          "title": "Speaker Name",
+          "type": "string"
+        },
+        "line": {
+          "title": "Line",
+          "type": "string"
+        },
+        "emotion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Emotion"
+        },
+        "action_hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action Hint"
+        }
+      },
+      "required": [
+        "block_id",
+        "order",
+        "speaker",
+        "speaker_name",
+        "line"
+      ],
+      "title": "DialogueBlock",
+      "type": "object"
+    },
+    "EmbeddedValidation": {
+      "additionalProperties": false,
+      "description": "The ``validation`` block embedded in the document.\n\nIn the draft state ``passed`` is ``False`` and ``validated_at`` is ``None``;\n``mark_validated`` rewrites these when branding a validated document.",
+      "properties": {
+        "schema_version": {
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "validated_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validated At"
+        },
+        "passed": {
+          "default": false,
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version"
+      ],
+      "title": "EmbeddedValidation",
+      "type": "object"
+    },
+    "KeyEvent": {
+      "additionalProperties": false,
+      "description": "A key event in the document layer. Uses ``status`` (not ``importance``).",
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "adapted",
+            "partially_adapted",
+            "merged",
+            "omitted",
+            "pending_review"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "text",
+        "status"
+      ],
+      "title": "KeyEvent",
+      "type": "object"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "description": "A location. Minimal in P0a-lite-1; the table may be empty.",
+      "properties": {
+        "location_id": {
+          "title": "Location Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "location_id",
+        "name"
+      ],
+      "title": "Location",
+      "type": "object"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "description": "Document metadata. ``source_chapter_count`` must be an int >= 3.",
+      "properties": {
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "original_author": {
+          "title": "Original Author",
+          "type": "string"
+        },
+        "schema_version": {
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "schema_doc_version": {
+          "title": "Schema Doc Version",
+          "type": "string"
+        },
+        "generator_version": {
+          "title": "Generator Version",
+          "type": "string"
+        },
+        "prompt_version": {
+          "title": "Prompt Version",
+          "type": "string"
+        },
+        "generated_at": {
+          "title": "Generated At",
+          "type": "string"
+        },
+        "language": {
+          "title": "Language",
+          "type": "string"
+        },
+        "source_chapter_count": {
+          "minimum": 3,
+          "title": "Source Chapter Count",
+          "type": "integer"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "title",
+        "original_author",
+        "schema_version",
+        "schema_doc_version",
+        "generator_version",
+        "prompt_version",
+        "generated_at",
+        "language",
+        "source_chapter_count",
+        "model"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "NoteBlock": {
+      "additionalProperties": false,
+      "description": "An author/production note block.",
+      "properties": {
+        "block_id": {
+          "title": "Block Id",
+          "type": "string"
+        },
+        "order": {
+          "title": "Order",
+          "type": "integer"
+        },
+        "type": {
+          "const": "note",
+          "default": "note",
+          "title": "Type",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "block_id",
+        "order",
+        "text"
+      ],
+      "title": "NoteBlock",
+      "type": "object"
+    },
+    "RevisionNote": {
+      "additionalProperties": false,
+      "description": "A minimal revision note. May be empty in P0a-lite-1.",
+      "properties": {
+        "note_id": {
+          "title": "Note Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "note_id",
+        "text"
+      ],
+      "title": "RevisionNote",
+      "type": "object"
+    },
+    "Scene": {
+      "additionalProperties": false,
+      "description": "A single scene with ordered content blocks.",
+      "properties": {
+        "scene_id": {
+          "title": "Scene Id",
+          "type": "string"
+        },
+        "order": {
+          "title": "Order",
+          "type": "integer"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "source_chapters": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Chapters",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "content_blocks": {
+          "default": [],
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "action": "#/$defs/ActionBlock",
+                "dialogue": "#/$defs/DialogueBlock",
+                "note": "#/$defs/NoteBlock",
+                "voice_over": "#/$defs/VoiceOverBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ActionBlock"
+              },
+              {
+                "$ref": "#/$defs/DialogueBlock"
+              },
+              {
+                "$ref": "#/$defs/VoiceOverBlock"
+              },
+              {
+                "$ref": "#/$defs/NoteBlock"
+              }
+            ]
+          },
+          "title": "Content Blocks",
+          "type": "array"
+        },
+        "location_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location Id"
+        },
+        "location_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location Name"
+        },
+        "time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Time"
+        },
+        "characters": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Characters",
+          "type": "array"
+        },
+        "scene_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scene Type"
+        },
+        "estimated_duration_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Estimated Duration Seconds"
+        },
+        "dramatic_goal": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dramatic Goal"
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Conflict"
+        },
+        "adaptation_notes": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Adaptation Notes",
+          "type": "array"
+        },
+        "quality_flags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Quality Flags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "scene_id",
+        "order",
+        "title",
+        "summary"
+      ],
+      "title": "Scene",
+      "type": "object"
+    },
+    "Screenplay": {
+      "additionalProperties": false,
+      "description": "The screenplay body: an ordered list of scenes.",
+      "properties": {
+        "scenes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Scene"
+          },
+          "title": "Scenes",
+          "type": "array"
+        }
+      },
+      "title": "Screenplay",
+      "type": "object"
+    },
+    "VoiceOverBlock": {
+      "additionalProperties": false,
+      "description": "A voice-over block.",
+      "properties": {
+        "block_id": {
+          "title": "Block Id",
+          "type": "string"
+        },
+        "order": {
+          "title": "Order",
+          "type": "integer"
+        },
+        "type": {
+          "const": "voice_over",
+          "default": "voice_over",
+          "title": "Type",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "block_id",
+        "order",
+        "text"
+      ],
+      "title": "VoiceOverBlock",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The backend-normalized screenplay document, not yet validated.\n\nField order matches SKILL.md section 6. P0a-lite-1 allows empty\n``characters``, ``locations``, ``adaptation_changes``, and\n``revision_notes`` arrays, but the fields must always be present. Structural\nchecks (e.g. non-empty scenes, valid references) are the validators layer's\nresponsibility, not enforced here.",
+  "properties": {
+    "metadata": {
+      "$ref": "#/$defs/Metadata"
+    },
+    "adaptation_config": {
+      "$ref": "#/$defs/AdaptationConfig"
+    },
+    "chapters": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Chapter"
+      },
+      "title": "Chapters",
+      "type": "array"
+    },
+    "characters": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Character"
+      },
+      "title": "Characters",
+      "type": "array"
+    },
+    "locations": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Location"
+      },
+      "title": "Locations",
+      "type": "array"
+    },
+    "screenplay": {
+      "$ref": "#/$defs/Screenplay"
+    },
+    "adaptation_changes": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/AdaptationChange"
+      },
+      "title": "Adaptation Changes",
+      "type": "array"
+    },
+    "validation": {
+      "$ref": "#/$defs/EmbeddedValidation"
+    },
+    "revision_notes": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RevisionNote"
+      },
+      "title": "Revision Notes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "metadata",
+    "adaptation_config",
+    "screenplay",
+    "validation"
+  ],
+  "title": "ScreenplayDraftDocument",
+  "type": "object",
+  "$id": "novel-to-screenplay.screenplay.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-schema-version": "0.1.0"
+}

@@ -93,12 +93,14 @@ source = { editable = "packages/exporters" }
 dependencies = [
     { name = "ruamel-yaml" },
     { name = "shared-types" },
+    { name = "validators" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "ruamel-yaml", specifier = ">=0.18" },
     { name = "shared-types", editable = "packages/shared_types" },
+    { name = "validators", editable = "packages/validators" },
 ]
 
 [[package]]

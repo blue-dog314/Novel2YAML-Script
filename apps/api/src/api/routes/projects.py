@@ -103,6 +103,17 @@ def get_generation_notice(
     )
 
 
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(
+    project_id: str,
+    store: InMemoryStore = Depends(get_store),
+) -> None:
+    deleted = store.delete_project(project_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
+    return None
+
+
 def _get_project_or_404(store: InMemoryStore, project_id: str) -> StoredProject:
     project = store.get_project(project_id)
     if project is None:

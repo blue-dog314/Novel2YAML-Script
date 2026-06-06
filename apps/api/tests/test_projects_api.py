@@ -94,3 +94,26 @@ def test_unknown_project_returns_404(client: TestClient) -> None:
     response = client.get("/projects/missing/chapters")
 
     assert response.status_code == 404
+
+
+def test_delete_project_removes_project_and_artifacts(client: TestClient) -> None:
+    from conftest import create_confirmed_project
+
+    project_id = create_confirmed_project(client)
+    generate_response = client.post("/screenplays/generate", json={"project_id": project_id})
+    assert generate_response.status_code == 201
+    screenplay_id = generate_response.json()["screenplay_id"]
+    assert screenplay_id is not None
+
+    delete_response = client.delete(f"/projects/{project_id}")
+
+    assert delete_response.status_code == 204
+    # Project, its chapters/source text, and the generated screenplay are all gone.
+    assert client.get(f"/projects/{project_id}/chapters").status_code == 404
+    assert client.get(f"/screenplays/{screenplay_id}/artifacts").status_code == 404
+
+
+def test_delete_unknown_project_returns_404(client: TestClient) -> None:
+    response = client.delete("/projects/missing")
+
+    assert response.status_code == 404

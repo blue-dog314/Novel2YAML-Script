@@ -31,6 +31,7 @@ from shared_types import (
     ScenePlanOutput,
     Screenplay,
     ScreenplayDraftDocument,
+    TimelineEntry,
     VoiceOverBlock,
 )
 
@@ -137,6 +138,7 @@ def assemble_screenplay(
         character_registry,
         location_registry,
     )
+    timeline = _assemble_timeline(chapter_summaries, scenes)
     return ScreenplayDraftDocument(
         metadata=_make_metadata(
             project_id=project_id,
@@ -151,6 +153,7 @@ def assemble_screenplay(
         characters=character_registry.characters(),
         locations=location_registry.locations(),
         screenplay=Screenplay(scenes=scenes),
+        timeline=timeline,
         adaptation_changes=[],
         validation=EmbeddedValidation(schema_version=SCREENPLAY_SCHEMA_VERSION),
         revision_notes=[],
@@ -218,6 +221,38 @@ def _assemble_chapters(chapter_summaries: list[ChapterSummaryOutput]) -> list[Ch
         )
         for index, chapter in enumerate(chapter_summaries, start=1)
     ]
+
+
+def _assemble_timeline(
+    chapter_summaries: list[ChapterSummaryOutput],
+    scenes: list[Scene],
+) -> list[TimelineEntry]:
+    """Derive a deterministic story timeline from chapter key events.
+
+    P0a "timeline extraction" is a backend-owned aggregation, not a new LLM
+    stage. One entry is emitted per chapter key event in chapter order then
+    event order. ``related_scenes`` is computed deterministically as the scenes
+    whose ``source_chapters`` include the originating chapter (preserving scene
+    order). ``time`` stays ``None`` since P0a does not model absolute time.
+    """
+    scenes_by_chapter: dict[str, list[str]] = {}
+    for scene in scenes:
+        for chapter_id in scene.source_chapters:
+            scenes_by_chapter.setdefault(chapter_id, []).append(scene.scene_id)
+    timeline: list[TimelineEntry] = []
+    for chapter in chapter_summaries:
+        related_scenes = scenes_by_chapter.get(chapter.chapter_id, [])
+        for event_index, key_event in enumerate(chapter.key_events, start=1):
+            timeline.append(
+                TimelineEntry(
+                    entry_id=f"{chapter.chapter_id}-tl-{event_index:03d}",
+                    description=key_event.text,
+                    time=None,
+                    source_chapters=[chapter.chapter_id],
+                    related_scenes=list(related_scenes),
+                )
+            )
+    return timeline
 
 
 def _assemble_content_block(

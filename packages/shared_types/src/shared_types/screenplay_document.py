@@ -173,6 +173,28 @@ class Screenplay(BaseModel):
     scenes: list[Scene] = []
 
 
+# --- timeline (P0a) --------------------------------------------------------
+
+
+class TimelineEntry(BaseModel):
+    """A single story-timeline entry.
+
+    Backend-owned: the backend derives the timeline deterministically from
+    chapter key events (it owns ``entry_id`` and the ``related_scenes`` link).
+    ``time`` is optional free text since P0a does not yet model absolute time.
+    ``source_chapters`` records provenance; ``related_scenes`` lists the scenes
+    that cover those chapters and is validated against known scene ids.
+    """
+
+    model_config = FORBID_EXTRA_CONFIG
+
+    entry_id: str
+    description: str
+    time: str | None = None
+    source_chapters: list[str] = []
+    related_scenes: list[str] = []
+
+
 # --- adaptation changes ----------------------------------------------------
 
 
@@ -274,6 +296,7 @@ class ScreenplayDraftDocument(BaseModel):
     characters: list[Character] = []
     locations: list[Location] = []
     screenplay: Screenplay
+    timeline: list[TimelineEntry] = []
     adaptation_changes: list[AdaptationChange] = []
     validation: EmbeddedValidation
     revision_notes: list[RevisionNote] = []

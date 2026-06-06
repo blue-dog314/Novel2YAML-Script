@@ -226,6 +226,29 @@ def _validate_references(document: ScreenplayDraftDocument) -> list[ValidationEr
                     )
                 )
 
+    timeline_ids = [entry.entry_id for entry in document.timeline]
+    errors.extend(_duplicate_issues(timeline_ids, "DUPLICATE_TIMELINE_ENTRY_ID", "timeline"))
+    for entry_index, entry in enumerate(document.timeline):
+        entry_path = f"timeline[{entry_index}]"
+        for source_chapter in entry.source_chapters:
+            if source_chapter not in valid_chapter_ids:
+                errors.append(
+                    _issue(
+                        "UNKNOWN_TIMELINE_SOURCE_CHAPTER",
+                        f"timeline entry references unknown chapter {source_chapter!r}",
+                        f"{entry_path}.source_chapters",
+                    )
+                )
+        for related_scene in entry.related_scenes:
+            if related_scene not in valid_scene_ids:
+                errors.append(
+                    _issue(
+                        "UNKNOWN_TIMELINE_SCENE",
+                        f"timeline entry references unknown scene {related_scene!r}",
+                        f"{entry_path}.related_scenes",
+                    )
+                )
+
     return errors
 
 

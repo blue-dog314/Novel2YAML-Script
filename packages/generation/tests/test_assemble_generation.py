@@ -302,3 +302,37 @@ def test_note_block_assembles_as_note() -> None:
     )
     document = assemble_screenplay(**_kwargs(scene_contents=[content, _scene_content("sc-002")]))
     assert document.screenplay.scenes[0].content_blocks[0].type == "note"
+
+
+def test_timeline_derived_from_chapter_key_events() -> None:
+    document = assemble_screenplay(**_kwargs())
+    # One entry per chapter key event (each fixture chapter has one event).
+    assert [entry.entry_id for entry in document.timeline] == [
+        "ch-1-tl-001",
+        "ch-2-tl-001",
+        "ch-3-tl-001",
+    ]
+    assert [entry.description for entry in document.timeline] == [
+        "事件 1",
+        "事件 2",
+        "事件 3",
+    ]
+    assert all(entry.time is None for entry in document.timeline)
+
+
+def test_timeline_related_scenes_follow_source_chapters() -> None:
+    # sc-001 sources ch-1 & ch-2; sc-002 sources ch-3.
+    document = assemble_screenplay(**_kwargs())
+    by_id = {entry.entry_id: entry for entry in document.timeline}
+    assert by_id["ch-1-tl-001"].source_chapters == ["ch-1"]
+    assert by_id["ch-1-tl-001"].related_scenes == ["sc-001"]
+    assert by_id["ch-2-tl-001"].related_scenes == ["sc-001"]
+    assert by_id["ch-3-tl-001"].related_scenes == ["sc-002"]
+
+
+def test_timeline_is_deterministic() -> None:
+    first = assemble_screenplay(**_kwargs())
+    second = assemble_screenplay(**_kwargs())
+    assert [e.model_dump(mode="json") for e in first.timeline] == [
+        e.model_dump(mode="json") for e in second.timeline
+    ]

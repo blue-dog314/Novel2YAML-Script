@@ -1,6 +1,6 @@
 # Screenplay YAML Schema
 
-Version: `0.1.0`
+Version: `0.2.0`
 
 This document summarizes the P0a-lite screenplay document schema. The authoritative machine-readable schema is packaged as `screenplay.schema.json` and is generated from `shared_types.ScreenplayDraftDocument`.
 
@@ -14,9 +14,10 @@ The screenplay document uses these required top-level fields:
 4. `characters`
 5. `locations`
 6. `screenplay`
-7. `adaptation_changes`
-8. `validation`
-9. `revision_notes`
+7. `timeline`
+8. `adaptation_changes`
+9. `validation`
+10. `revision_notes`
 
 ## Required metadata
 
@@ -39,6 +40,10 @@ Supported content block types:
 - `dialogue`
 - `voice_over`
 - `note`
+
+## Timeline
+
+`timeline` is a backend-derived list of story events. Each entry has `entry_id`, `description`, an optional `time` (free text in P0a), `source_chapters` (provenance), and `related_scenes` (the scenes covering those chapters). Runtime validators check that `source_chapters` reference known chapters and `related_scenes` reference known scenes.
 
 ## Author editing guide
 
@@ -92,4 +97,4 @@ An `omitted` chapter is valid only when its key events are marked `omitted` or
 
 ## Validation boundary
 
-JSON Schema covers required fields, types, enums, numeric ranges, and unknown-field rejection. Runtime validators remain responsible for reference and coverage checks such as valid `source_chapters`, duplicate orders, empty scenes, and chapter coverage.
+JSON Schema covers required fields, types, enums, numeric ranges, and unknown-field rejection. Runtime validators remain responsible for reference and coverage checks such as valid `source_chapters`, duplicate orders, empty scenes, timeline references, and chapter coverage.

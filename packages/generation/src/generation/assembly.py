@@ -14,6 +14,7 @@ from shared_types import (
     ActionBlock,
     AdaptationConfig,
     Chapter,
+    Character,
     ChapterSummaryOutput,
     DialogueBlock,
     EmbeddedValidation,
@@ -35,6 +36,40 @@ from shared_types import (
 _SLUG_SEPARATOR_RE = re.compile(r"-+")
 
 
+class _CharacterRegistry:
+    """Backend-owned character id/name registry.
+
+    The model layer only emits character *names* (dialogue ``speaker_name``,
+    scene ``characters``, chapter ``characters_mentioned``). The backend owns id
+    assignment, mapping each distinct name (casefolded) to a stable ``char-<slug>``
+    id while preserving the first-seen display name. This keeps ID ownership in
+    the backend per CLAUDE.md and lets the reference validator activate.
+    """
+
+    def __init__(self) -> None:
+        self._by_key: dict[str, tuple[str, str]] = {}
+        self._unnamed_counter = 0
+
+    def register(self, name: str) -> str:
+        key = name.strip().casefold()
+        existing = self._by_key.get(key)
+        if existing is not None:
+            return existing[0]
+        core = _slug_core(name)
+        if not core:
+            self._unnamed_counter += 1
+            core = f"unnamed-{self._unnamed_counter}"
+        character_id = f"char-{core}"
+        self._by_key[key] = (character_id, name.strip())
+        return character_id
+
+    def characters(self) -> list[Character]:
+        return [
+            Character(character_id=character_id, name=display_name)
+            for character_id, display_name in self._by_key.values()
+        ]
+
+
 def assemble_screenplay(
     *,
     chapter_summaries: list[ChapterSummaryOutput],
@@ -51,14 +86,17 @@ def assemble_screenplay(
     scene_ids = [_seq_id("sc", index) for index, _ in enumerate(scene_plan.scenes, start=1)]
     content_by_scene_id = _index_scene_contents(scene_contents, scene_ids)
     chapters = _assemble_chapters(chapter_summaries)
-    speaker_registry: dict[str, str] = {}
-    unnamed_counter = {"value": 0}
+    character_registry = _CharacterRegistry()
+    # Register chapter-mentioned characters first so ids follow chapter order,
+    # then scene/dialogue names get registered during scene assembly below.
+    for summary in chapter_summaries:
+        for name in summary.characters_mentioned:
+            character_registry.register(name)
     scenes = _assemble_scenes(
         scene_plan,
         scene_ids,
         content_by_scene_id,
-        speaker_registry,
-        unnamed_counter,
+        character_registry,
     )
     return ScreenplayDraftDocument(
         metadata=_make_metadata(
@@ -71,7 +109,7 @@ def assemble_screenplay(
         ),
         adaptation_config=adaptation_config or AdaptationConfig(),
         chapters=chapters,
-        characters=[],
+        characters=character_registry.characters(),
         locations=[],
         screenplay=Screenplay(scenes=scenes),
         adaptation_changes=[],
@@ -119,23 +157,6 @@ def _slug_core(name: str) -> str:
     return _SLUG_SEPARATOR_RE.sub("-", "".join(parts)).strip("-")
 
 
-def _slugify_speaker(
-    name: str,
-    registry: dict[str, str],
-    unnamed_counter: dict[str, int],
-) -> str:
-    key = name.strip().casefold()
-    if key in registry:
-        return registry[key]
-    core = _slug_core(name)
-    if not core:
-        unnamed_counter["value"] += 1
-        core = f"unnamed-{unnamed_counter['value']}"
-    speaker_id = f"char-{core}"
-    registry[key] = speaker_id
-    return speaker_id
-
-
 def _assemble_key_events(chapter: ChapterSummaryOutput) -> list[KeyEvent]:
     return [
         KeyEvent(
@@ -164,8 +185,7 @@ def _assemble_content_block(
     scene_id: str,
     index: int,
     block: Any,
-    speaker_registry: dict[str, str],
-    unnamed_counter: dict[str, int],
+    character_registry: _CharacterRegistry,
 ) -> ActionBlock | DialogueBlock | VoiceOverBlock | NoteBlock:
     block_id = f"{scene_id}-blk-{index:03d}"
     if isinstance(block, ModelActionBlock):
@@ -174,7 +194,7 @@ def _assemble_content_block(
         return DialogueBlock(
             block_id=block_id,
             order=index,
-            speaker=_slugify_speaker(block.speaker_name, speaker_registry, unnamed_counter),
+            speaker=character_registry.register(block.speaker_name),
             speaker_name=block.speaker_name,
             line=block.line,
             emotion=block.emotion,
@@ -191,8 +211,7 @@ def _assemble_scenes(
     scene_plan: ScenePlanOutput,
     scene_ids: list[str],
     content_by_scene_id: dict[str, SceneContentOutput],
-    speaker_registry: dict[str, str],
-    unnamed_counter: dict[str, int],
+    character_registry: _CharacterRegistry,
 ) -> list[Scene]:
     scenes: list[Scene] = []
     for index, (scene_id, plan_item) in enumerate(zip(scene_ids, scene_plan.scenes, strict=True), start=1):
@@ -209,15 +228,16 @@ def _assemble_scenes(
                         scene_id,
                         block_index,
                         block,
-                        speaker_registry,
-                        unnamed_counter,
+                        character_registry,
                     )
                     for block_index, block in enumerate(content.content_blocks, start=1)
                 ],
                 location_id=None,
                 location_name=plan_item.location_name,
                 time=plan_item.time,
-                characters=plan_item.characters,
+                characters=[
+                    character_registry.register(name) for name in plan_item.characters
+                ],
                 scene_type=None,
                 estimated_duration_seconds=None,
                 dramatic_goal=plan_item.dramatic_goal,

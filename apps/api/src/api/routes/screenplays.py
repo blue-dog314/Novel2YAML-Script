@@ -7,12 +7,25 @@ from importlib.resources import files
 import screenplay_schema
 from fastapi import APIRouter, Depends, HTTPException, status
 from exporters import export_validated_yaml
-from generation import ChapterInput, LLMClient, PipelineFailure, generate_screenplay_with_artifacts
+from generation import (
+    ChapterInput,
+    LLMClient,
+    PipelineFailure,
+    generate_screenplay_with_artifacts,
+    regenerate_scene,
+)
 from shared_types import ValidationReport
 from validators import validate_yaml_text
 
 from ..deps import get_llm_client, get_store
-from ..models import ArtifactsResponse, GenerateRequest, JobResponse, SchemaDocResponse, ValidateYamlRequest
+from ..models import (
+    ArtifactsResponse,
+    GenerateRequest,
+    JobResponse,
+    SceneRegenerateRequest,
+    SchemaDocResponse,
+    ValidateYamlRequest,
+)
 from ..store import InMemoryStore
 
 router = APIRouter(tags=["screenplays"])
@@ -71,6 +84,72 @@ def validate_yaml(request: ValidateYamlRequest) -> ValidationReport:
     """Validate author-edited screenplay YAML without storing it."""
     _, report = validate_yaml_text(request.yaml)
     return report
+
+
+@router.post(
+    "/screenplays/{screenplay_id}/scenes/regenerate",
+    response_model=ArtifactsResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def regenerate_scene_endpoint(
+    screenplay_id: str,
+    request: SceneRegenerateRequest,
+    store: InMemoryStore = Depends(get_store),
+    llm: LLMClient = Depends(get_llm_client),
+) -> ArtifactsResponse:
+    """Regenerate a single scene, producing a new screenplay that keeps the old one.
+
+    ``StoredScreenplay`` is frozen and the product keeps iteration history, so a
+    successful regeneration is stored under a fresh ``screenplay_id`` rather than
+    mutating the source screenplay in place.
+    """
+    screenplay = store.get_screenplay(screenplay_id)
+    if screenplay is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenplay not found.")
+
+    project = store.get_project(screenplay.project_id)
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project for this screenplay not found.",
+        )
+
+    try:
+        new_document, new_artifacts = regenerate_scene(
+            artifacts=screenplay.artifacts,
+            scene_id=request.scene_id,
+            project_id=project.project_id,
+            title=project.title,
+            original_author=project.original_author,
+            language=project.language,
+            model=screenplay.document.metadata.model,
+            llm=llm,
+            adaptation_config=screenplay.document.adaptation_config,
+        )
+    except PipelineFailure as exc:
+        if (
+            exc.error.failed_stage == "scene_content_generation"
+            and exc.error.retryable is False
+            and "Unknown scene_id" in exc.error.error_message
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=exc.error.error_message,
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=exc.error.error_message,
+        ) from exc
+
+    yaml_text, validation_report = export_validated_yaml(new_document)
+    new_screenplay = store.create_screenplay(
+        project_id=project.project_id,
+        yaml=yaml_text,
+        document=new_document,
+        validation_report=validation_report,
+        artifacts=new_artifacts,
+    )
+    return ArtifactsResponse.model_validate(new_screenplay, from_attributes=True)
 
 
 @router.get("/screenplays/{screenplay_id}/artifacts", response_model=ArtifactsResponse)

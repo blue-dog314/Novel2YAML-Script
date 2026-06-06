@@ -70,8 +70,13 @@ uploaded chapters
 
 ### P0b
 
-- 场景级局部重生成。
+恢复链(已实现):
+
+- 场景级局部重生成(已实现):`POST /screenplays/{id}/scenes/regenerate`,只重写指定场景并产出新 screenplay,保留原 screenplay。
+- failed-stage recovery(已实现):生成管线缓存各阶段中间产物;`POST /jobs/{id}/retry` 从失败阶段恢复重试,跳过已完成阶段,不重复调用 LLM。
+
+尚未实现:
+
 - 更细粒度 `source_refs`。
 - generation report。
-- failed-stage recovery。
 - 更强自动引用修复。

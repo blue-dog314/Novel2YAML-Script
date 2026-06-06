@@ -56,6 +56,7 @@ dependencies = [
     { name = "exporters" },
     { name = "fastapi" },
     { name = "generation" },
+    { name = "screenplay-schema" },
     { name = "shared-types" },
     { name = "uvicorn" },
 ]
@@ -65,6 +66,7 @@ requires-dist = [
     { name = "exporters", editable = "packages/exporters" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "generation", editable = "packages/generation" },
+    { name = "screenplay-schema", editable = "packages/screenplay_schema" },
     { name = "shared-types", editable = "packages/shared_types" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]

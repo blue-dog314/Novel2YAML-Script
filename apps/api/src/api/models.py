@@ -55,6 +55,15 @@ class GenerateRequest(BaseModel):
     adaptation_config: AdaptationConfig | None = None
 
 
+class ValidateYamlRequest(BaseModel):
+    yaml: str
+
+
+class SchemaDocResponse(BaseModel):
+    schema_filename: str
+    schema_doc: str
+
+
 class JobResponse(BaseModel):
     job_id: str
     status: JobStatus

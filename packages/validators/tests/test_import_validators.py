@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 from shared_types import (
+    AdaptationChange,
     AdaptationConfig,
     Chapter,
     DialogueBlock,
@@ -247,6 +248,134 @@ def test_source_chapter_count_mismatch_fails_reference_validation() -> None:
     report = validate_document(_draft(metadata=metadata))
     assert report.reference_validation_passed is False
     assert any(error.code == "SOURCE_CHAPTER_COUNT_MISMATCH" for error in report.errors)
+
+
+def test_adaptation_change_unknown_references_fail_reference_validation() -> None:
+    report = validate_document(
+        _draft(
+            adaptation_changes=[
+                AdaptationChange(
+                    change_id="chg-1",
+                    type="compressed",
+                    source_chapters=["missing"],
+                    affected_scenes=["missing-scene"],
+                    description="Condensed a missing chapter.",
+                    reason="Invalid test fixture.",
+                )
+            ]
+        )
+    )
+
+    assert report.reference_validation_passed is False
+    assert any(error.code == "UNKNOWN_ADAPTATION_CHANGE_SOURCE_CHAPTER" for error in report.errors)
+    assert any(error.code == "UNKNOWN_ADAPTATION_CHANGE_SCENE" for error in report.errors)
+
+
+def test_non_added_adaptation_change_requires_source_chapters() -> None:
+    report = validate_document(
+        _draft(
+            adaptation_changes=[
+                AdaptationChange(
+                    change_id="chg-1",
+                    type="compressed",
+                    source_chapters=[],
+                    affected_scenes=["sc-1"],
+                    description="Condensed material.",
+                    reason="Pacing.",
+                )
+            ]
+        )
+    )
+
+    assert report.reference_validation_passed is False
+    assert any(error.code == "ADAPTATION_CHANGE_SOURCE_CHAPTERS_EMPTY" for error in report.errors)
+
+
+def test_empty_key_events_fail_coverage_validation() -> None:
+    chapters = [_chapter(1), _chapter(2), _chapter(3)]
+    chapters[1] = Chapter(
+        chapter_id="ch-2",
+        order=2,
+        title="Chapter 2",
+        summary="The story continues.",
+        key_events=[],
+    )
+
+    report = validate_document(_draft(chapters=chapters))
+
+    assert report.coverage_validation_passed is False
+    assert any(error.code == "CHAPTER_KEY_EVENTS_EMPTY" for error in report.errors)
+
+
+def test_omitted_chapter_requires_omitted_or_merged_key_events() -> None:
+    chapters = [_chapter(1), _chapter(2), _chapter(3)]
+    scene = Scene(
+        scene_id="sc-1",
+        order=1,
+        title="Opening Scene",
+        source_chapters=["ch-1", "ch-2"],
+        summary="Alice greets.",
+        content_blocks=[_block()],
+    )
+
+    report = validate_document(
+        _draft(
+            chapters=chapters,
+            screenplay=Screenplay(scenes=[scene]),
+            adaptation_changes=[
+                AdaptationChange(
+                    change_id="chg-1",
+                    type="omitted",
+                    source_chapters=["ch-3"],
+                    affected_scenes=[],
+                    description="Chapter 3 is omitted.",
+                    reason="Scope control.",
+                )
+            ],
+        )
+    )
+
+    assert report.coverage_validation_passed is False
+    assert any(error.code == "OMITTED_CHAPTER_HAS_ACTIVE_KEY_EVENTS" for error in report.errors)
+
+
+def test_omitted_chapter_with_omitted_key_events_passes_coverage() -> None:
+    chapters = [_chapter(1), _chapter(2), _chapter(3)]
+    chapters[2] = Chapter(
+        chapter_id="ch-3",
+        order=3,
+        title="Chapter 3",
+        summary="The story continues.",
+        key_events=[KeyEvent(event_id="ev-3", text="An event.", status="omitted")],
+    )
+    scene = Scene(
+        scene_id="sc-1",
+        order=1,
+        title="Opening Scene",
+        source_chapters=["ch-1", "ch-2"],
+        summary="Alice greets.",
+        content_blocks=[_block()],
+    )
+
+    report = validate_document(
+        _draft(
+            chapters=chapters,
+            screenplay=Screenplay(scenes=[scene]),
+            adaptation_changes=[
+                AdaptationChange(
+                    change_id="chg-1",
+                    type="omitted",
+                    source_chapters=["ch-3"],
+                    affected_scenes=[],
+                    description="Chapter 3 is omitted.",
+                    reason="Scope control.",
+                )
+            ],
+        )
+    )
+
+    assert report.reference_validation_passed is True
+    assert report.coverage_validation_passed is True
 
 
 def test_character_refs_checked_only_when_character_table_populated() -> None:

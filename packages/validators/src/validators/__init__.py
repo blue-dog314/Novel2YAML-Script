@@ -104,6 +104,7 @@ def _validate_references(document: ScreenplayDraftDocument) -> list[ValidationEr
     chapter_orders = [chapter.order for chapter in document.chapters]
     scene_ids = [scene.scene_id for scene in document.screenplay.scenes]
     scene_orders = [scene.order for scene in document.screenplay.scenes]
+    change_ids = [change.change_id for change in document.adaptation_changes]
     character_ids = {character.character_id for character in document.characters}
     location_ids = {location.location_id for location in document.locations}
 
@@ -111,6 +112,17 @@ def _validate_references(document: ScreenplayDraftDocument) -> list[ValidationEr
     errors.extend(_duplicate_issues(chapter_orders, "DUPLICATE_CHAPTER_ORDER", "chapters.order"))
     errors.extend(_duplicate_issues(scene_ids, "DUPLICATE_SCENE_ID", "screenplay.scenes"))
     errors.extend(_duplicate_issues(scene_orders, "DUPLICATE_SCENE_ORDER", "screenplay.scenes.order"))
+    errors.extend(_duplicate_issues(change_ids, "DUPLICATE_ADAPTATION_CHANGE_ID", "adaptation_changes"))
+
+    for chapter_index, chapter in enumerate(document.chapters):
+        event_ids = [event.event_id for event in chapter.key_events]
+        errors.extend(
+            _duplicate_issues(
+                event_ids,
+                "DUPLICATE_KEY_EVENT_ID",
+                f"chapters[{chapter_index}].key_events",
+            )
+        )
 
     if len(document.chapters) != document.metadata.source_chapter_count:
         errors.append(
@@ -184,6 +196,36 @@ def _validate_references(document: ScreenplayDraftDocument) -> list[ValidationEr
                 )
             )
 
+    valid_scene_ids = set(scene_ids)
+    for change_index, change in enumerate(document.adaptation_changes):
+        change_path = f"adaptation_changes[{change_index}]"
+        if change.type != "added" and not change.source_chapters:
+            errors.append(
+                _issue(
+                    "ADAPTATION_CHANGE_SOURCE_CHAPTERS_EMPTY",
+                    "non-added adaptation changes must identify source chapters",
+                    f"{change_path}.source_chapters",
+                )
+            )
+        for source_chapter in change.source_chapters:
+            if source_chapter not in valid_chapter_ids:
+                errors.append(
+                    _issue(
+                        "UNKNOWN_ADAPTATION_CHANGE_SOURCE_CHAPTER",
+                        f"adaptation change references unknown chapter {source_chapter!r}",
+                        f"{change_path}.source_chapters",
+                    )
+                )
+        for affected_scene in change.affected_scenes:
+            if affected_scene not in valid_scene_ids:
+                errors.append(
+                    _issue(
+                        "UNKNOWN_ADAPTATION_CHANGE_SCENE",
+                        f"adaptation change references unknown scene {affected_scene!r}",
+                        f"{change_path}.affected_scenes",
+                    )
+                )
+
     return errors
 
 
@@ -227,6 +269,14 @@ def _validate_coverage(document: ScreenplayDraftDocument) -> list[ValidationErro
         for source_chapter in change.source_chapters
     }
     for chapter in document.chapters:
+        if not chapter.key_events:
+            errors.append(
+                _issue(
+                    "CHAPTER_KEY_EVENTS_EMPTY",
+                    f"chapter {chapter.chapter_id!r} must include key events for coverage review",
+                    "chapters",
+                )
+            )
         if chapter.chapter_id not in covered_chapters and chapter.chapter_id not in omitted_chapters:
             errors.append(
                 _issue(
@@ -235,6 +285,23 @@ def _validate_coverage(document: ScreenplayDraftDocument) -> list[ValidationErro
                     "chapters",
                 )
             )
+        if chapter.chapter_id in omitted_chapters:
+            active_events = [
+                event.event_id
+                for event in chapter.key_events
+                if event.status not in {"omitted", "merged"}
+            ]
+            if active_events:
+                errors.append(
+                    _issue(
+                        "OMITTED_CHAPTER_HAS_ACTIVE_KEY_EVENTS",
+                        (
+                            f"omitted chapter {chapter.chapter_id!r} has key events "
+                            f"not marked omitted or merged: {active_events[0]!r}"
+                        ),
+                        "chapters",
+                    )
+                )
 
     return errors
 

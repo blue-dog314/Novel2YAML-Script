@@ -5,6 +5,7 @@ description = "FastAPI application for the novel-to-screenplay MVP"
 requires-python = ">=3.12"
 dependencies = [
     "shared-types",
+    "screenplay-schema",
     "generation",
     "exporters",
     "fastapi>=0.115",
@@ -13,6 +14,7 @@ dependencies = [
 
 [tool.uv.sources]
 shared-types = { workspace = true }
+screenplay-schema = { workspace = true }
 generation = { workspace = true }
 exporters = { workspace = true }
 

@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from importlib.resources import files
+
+import screenplay_schema
 from fastapi import APIRouter, Depends, HTTPException, status
 from exporters import export_validated_yaml
 from generation import ChapterInput, LLMClient, PipelineFailure, generate_screenplay
+from shared_types import ValidationReport
+from validators import validate_yaml_text
 
 from ..deps import get_llm_client, get_store
-from ..models import ArtifactsResponse, GenerateRequest, JobResponse
+from ..models import ArtifactsResponse, GenerateRequest, JobResponse, SchemaDocResponse, ValidateYamlRequest
 from ..store import InMemoryStore
 
 router = APIRouter(tags=["screenplays"])
@@ -56,6 +61,13 @@ def generate(
     return JobResponse.model_validate(completed_job, from_attributes=True)
 
 
+@router.post("/screenplays/validate-yaml", response_model=ValidationReport)
+def validate_yaml(request: ValidateYamlRequest) -> ValidationReport:
+    """Validate author-edited screenplay YAML without storing it."""
+    _, report = validate_yaml_text(request.yaml)
+    return report
+
+
 @router.get("/screenplays/{screenplay_id}/artifacts", response_model=ArtifactsResponse)
 def get_artifacts(
     screenplay_id: str,
@@ -65,3 +77,29 @@ def get_artifacts(
     if screenplay is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenplay not found.")
     return ArtifactsResponse.model_validate(screenplay, from_attributes=True)
+
+
+@router.get("/screenplays/{screenplay_id}/validation-report", response_model=ValidationReport)
+def get_validation_report(
+    screenplay_id: str,
+    store: InMemoryStore = Depends(get_store),
+) -> ValidationReport:
+    screenplay = store.get_screenplay(screenplay_id)
+    if screenplay is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenplay not found.")
+    return screenplay.validation_report
+
+
+@router.get("/screenplays/{screenplay_id}/schema-doc", response_model=SchemaDocResponse)
+def get_schema_doc(
+    screenplay_id: str,
+    store: InMemoryStore = Depends(get_store),
+) -> SchemaDocResponse:
+    screenplay = store.get_screenplay(screenplay_id)
+    if screenplay is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Screenplay not found.")
+    schema_doc = files(screenplay_schema).joinpath(screenplay_schema.SCHEMA_DOC_FILENAME).read_text(encoding="utf-8")
+    return SchemaDocResponse(
+        schema_filename=screenplay_schema.SCHEMA_DOC_FILENAME,
+        schema_doc=schema_doc,
+    )

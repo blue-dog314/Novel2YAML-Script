@@ -38,6 +38,44 @@ def test_generate_screenplay_happy_path(client: TestClient) -> None:
     assert artifacts["validation_report"]["errors"] == []
 
 
+def test_reimport_validation_and_report_endpoints(client: TestClient) -> None:
+    project_id = create_confirmed_project(client)
+    generate_response = client.post("/screenplays/generate", json={"project_id": project_id})
+    job = generate_response.json()
+    screenplay_id = job["screenplay_id"]
+
+    artifacts_response = client.get(f"/screenplays/{screenplay_id}/artifacts")
+    yaml_text = artifacts_response.json()["yaml"]
+
+    validate_response = client.post("/screenplays/validate-yaml", json={"yaml": yaml_text})
+    assert validate_response.status_code == 200
+    validation_report = validate_response.json()
+    assert validation_report["yaml_parse_passed"] is True
+    assert validation_report["schema_validation_passed"] is True
+    assert validation_report["reference_validation_passed"] is True
+    assert validation_report["coverage_validation_passed"] is True
+    assert validation_report["errors"] == []
+
+    report_response = client.get(f"/screenplays/{screenplay_id}/validation-report")
+    assert report_response.status_code == 200
+    assert report_response.json() == artifacts_response.json()["validation_report"]
+
+    schema_response = client.get(f"/screenplays/{screenplay_id}/schema-doc")
+    assert schema_response.status_code == 200
+    schema_payload = schema_response.json()
+    assert schema_payload["schema_filename"] == "schema.md"
+    assert "Screenplay YAML Schema" in schema_payload["schema_doc"]
+
+
+def test_validate_yaml_reports_author_edit_errors(client: TestClient) -> None:
+    response = client.post("/screenplays/validate-yaml", json={"yaml": "metadata: bad\u0000text"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["yaml_parse_passed"] is False
+    assert payload["errors"][0]["code"] == "ILLEGAL_CONTROL_CHARACTER"
+
+
 def test_generate_requires_confirmed_chapters(client: TestClient) -> None:
     create_response = client.post(
         "/projects",

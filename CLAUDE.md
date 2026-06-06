@@ -61,10 +61,10 @@ Do not design the first version as a one-shot prompt that directly transforms th
 ## Current source materials
 
 - `novel_to_screenplay_mvp_v3.md` is the main product and technical plan.
-- `SKILL.md` contains a project-specific skill/specification for implementation and review work.
+- `.claude/skills/novel-to-screenplay-mvp/SKILL.md` is the project-specific skill/specification for implementation and review work. It is registered as a project-level skill so Claude Code can load it for this repository only. (The repo-root `SKILL.md` is now a short pointer to this path.)
 - `novel-to-screenplay-project-skill.zip` contains a packaged copy of the skill.
 
-When implementing or reviewing this project, use `SKILL.md` as the most concise project contract and `novel_to_screenplay_mvp_v3.md` as the expanded rationale.
+When implementing or reviewing this project, use the skill at `.claude/skills/novel-to-screenplay-mvp/SKILL.md` as the most concise project contract and `novel_to_screenplay_mvp_v3.md` as the expanded rationale.
 
 ## MVP phase boundaries
 
@@ -157,7 +157,7 @@ Contract-layer design decisions that validators honor:
 - `ValidationReport` splits issues into `ValidationErrorIssue` and `ValidationWarningIssue` so `errors` can only hold error-severity issues at the type level.
 - `PipelineError` (`errors.py`) is the user-readable failure contract; its `failed_stage`/`error_type` literals enumerate the staged pipeline.
 
-When extending contracts, mirror `SKILL.md` (sections 6, 7, 10 cover the document model, scene structure, and model-output contracts) and keep the public surface in `__init__.__all__` in sync.
+When extending contracts, mirror the skill at `.claude/skills/novel-to-screenplay-mvp/SKILL.md` (sections 6, 7, 10 cover the document model, scene structure, and model-output contracts) and keep the public surface in `__init__.__all__` in sync.
 
 ## Current repository structure
 

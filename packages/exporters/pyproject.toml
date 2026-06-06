@@ -5,11 +5,13 @@ description = "YAML export and serialization"
 requires-python = ">=3.12"
 dependencies = [
     "shared-types",
+    "validators",
     "ruamel.yaml>=0.18",
 ]
 
 [tool.uv.sources]
 shared-types = { workspace = true }
+validators = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

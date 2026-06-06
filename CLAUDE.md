@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-This repository is a Python monorepo (managed with uv workspaces) for the AI-assisted novel-to-screenplay MVP. The scaffold includes workspace configuration, `apps/api`, core `packages/*`, `docs`, and a root smoke test.
+This repository is a Python monorepo (managed with uv workspaces) for the AI-assisted novel-to-screenplay MVP. It includes workspace configuration, `apps/api`, core `packages/*`, `docs`, and a root smoke test.
 
-The `shared_types` package is implemented as the cross-cutting contract layer (see "Contract layer (`shared_types`)" below). The other packages (`screenplay_schema`, `validators`, `generation`, `exporters`, `apps/api`) are still import-only placeholders exposing a single `MODULE_NAME` constant; their business logic is intentionally not implemented yet.
+P0a-lite-1 backend layers are implemented: `shared_types`, `screenplay_schema`, `validators`, `exporters`, `generation`, and `apps/api`. The API is a local FastAPI MVP with in-memory storage, upload rights confirmation, chapter confirmation, synchronous generation, job lookup, and artifact retrieval. `screenplay_schema` provides both generated JSON Schema and static schema documentation.
 
 ## Common commands
 
@@ -140,7 +140,7 @@ Logs must not store full source text by default. Source text, generated results,
 
 ## Contract layer (`shared_types`)
 
-`packages/shared_types` is the implemented cross-cutting contract layer. Every other package depends on it for type definitions; it owns no business logic. It is built as Pydantic models with `extra="forbid"` everywhere (via the non-exported `_config.FORBID_EXTRA_CONFIG`) so unknown/misspelled fields raise `ValidationError` instead of being silently dropped. This enforces the field-whitelist defense from the security section.
+`packages/shared_types` is the cross-cutting contract layer. Every other package depends on it for type definitions; it owns no business logic. It is built as Pydantic models with `extra="forbid"` everywhere (via the non-exported `_config.FORBID_EXTRA_CONFIG`) so unknown/misspelled fields raise `ValidationError` instead of being silently dropped. This enforces the field-whitelist defense from the security section.
 
 The package defines two distinct contract layers that must not be conflated:
 
@@ -149,7 +149,7 @@ The package defines two distinct contract layers that must not be conflated:
 
 The "validated" state is structural, not a field flag: `ValidatedScreenplay` (`validated.py`, `frozen=True`) wraps a `ScreenplayDraftDocument` together with the `ValidationReport` that cleared it. Only the validators layer should mint one, via `mark_validated` in `internal.py`. `internal.py` is deliberately NOT re-exported from the public barrel (`__init__.py`); import it as `shared_types.internal`. This is a convention-level boundary, not a runtime forgery guarantee.
 
-Contract-layer design decisions that the validators layer (next to be built) must honor:
+Contract-layer design decisions that validators honor:
 
 - `Metadata.source_chapter_count` is `Field(ge=3)`, the only numeric guard enforced at the type level.
 - `coverage_validation_passed` defaults to `None` ("not evaluated") and `mark_validated` treats `None` as a pass because P0a-lite-1 does not gate on coverage. The validators layer must NOT let a final report leave `coverage_validation_passed=None`; `None` is only acceptable on early draft/partial reports.
@@ -161,19 +161,19 @@ When extending contracts, mirror `SKILL.md` (sections 6, 7, 10 cover the documen
 
 ## Current repository structure
 
-The current scaffold uses this broad structure:
+The current implementation uses this broad structure:
 
 ```text
 apps/
-  api/
+  api/                 # FastAPI local MVP API
 packages/
-  screenplay_schema/
-  validators/
-  generation/
-  exporters/
-  shared_types/
-docs/
-tests/
+  screenplay_schema/   # JSON Schema and static schema docs
+  validators/          # deterministic validation layers
+  generation/          # staged generation orchestration
+  exporters/           # YAML export and revalidation
+  shared_types/        # cross-cutting contracts
+docs/                  # API, MVP, security, and test documentation
+tests/                 # root smoke tests
 ```
 
-`shared_types` is implemented (contract layer). The remaining packages hold only a `MODULE_NAME` placeholder. Do not assume screenplay schema, validators, exporters, generation pipeline, or API behavior have been implemented until those modules are added.
+All P0a-lite-1 backend packages are implemented. `apps/api` is intentionally local/demo-oriented: in-memory storage, synchronous generation, no authentication, and no production persistence.

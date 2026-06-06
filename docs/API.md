@@ -144,7 +144,9 @@
   "status": "succeeded",
   "project_id": "proj-...",
   "screenplay_id": "sp-...",
-  "error": null
+  "error": null,
+  "created_at": "2026-06-07T00:00:00+00:00",
+  "updated_at": "2026-06-07T00:00:01+00:00"
 }
 ```
 
@@ -214,13 +216,45 @@ Pipeline 失败会保存为失败 job，并在响应中返回 `PipelineError`。
   "status": "succeeded",
   "project_id": "proj-...",
   "screenplay_id": "sp-...",
-  "error": null
+  "error": null,
+  "created_at": "2026-06-07T00:00:00+00:00",
+  "updated_at": "2026-06-07T00:00:01+00:00"
 }
 ```
 
 ### Errors
 
 - `404`: job 不存在。
+
+## POST /jobs/{job_id}/retry
+
+对失败的 job 从已完成阶段恢复重试。生成管线会缓存每个阶段的中间产物
+（章节摘要、场景规划、场景正文）；重试时已完成的阶段直接复用缓存，不再调用
+LLM，只重跑失败处及其后续阶段。本接口无请求体，同步执行。
+
+### Response 200
+
+返回更新后的 `JobResponse`。重试成功时 `status` 变为 `succeeded` 并带上新的
+`screenplay_id`；若再次失败，则保持 `failed` 并刷新 `error` 与缓存产物，可继续重试。
+
+```json
+{
+  "job_id": "job-...",
+  "status": "succeeded",
+  "project_id": "proj-...",
+  "screenplay_id": "sp-...",
+  "error": null,
+  "created_at": "2026-06-07T00:00:00+00:00",
+  "updated_at": "2026-06-07T00:00:05+00:00"
+}
+```
+
+### Errors
+
+- `404`: job 不存在。
+- `409`: job 当前状态不是 `failed`（只有失败的 job 可重试）。
+- `409`: `error.retryable` 为 `false`（`detail` 为该错误的 `suggested_action`）。
+- `409`: 关联项目已不存在，无法重建生成输入。
 
 ## GET /screenplays/{screenplay_id}/artifacts
 
@@ -242,6 +276,42 @@ Pipeline 失败会保存为失败 job，并在响应中返回 `PipelineError`。
 ### Errors
 
 - `404`: screenplay 不存在。
+
+## POST /screenplays/{screenplay_id}/scenes/regenerate
+
+对已生成的剧本只重写指定场景。复用缓存的章节摘要与场景规划，仅对目标场景调用一次
+LLM，其余场景正文原样保留，然后确定性地重新组装、校验并导出。结果是一个**全新的
+screenplay（新 `screenplay_id`），原 screenplay 保留**以便对比与回滚。`model` 与
+`adaptation_config` 沿用原 screenplay 元数据。本接口同步执行。
+
+### Request
+
+```json
+{
+  "scene_id": "sc-001"
+}
+```
+
+`scene_id` 必须形如 `sc-NNN`（三位数字）。
+
+### Response 201
+
+返回新 screenplay 的 `ArtifactsResponse`（结构同 `GET /artifacts`）。
+
+```json
+{
+  "screenplay_id": "sp-...",
+  "yaml": "metadata:\n  ...",
+  "document": {},
+  "validation_report": {}
+}
+```
+
+### Errors
+
+- `404`: screenplay 不存在。
+- `404`: `scene_id` 在场景规划中不存在或格式不合法。
+- `409`: 关联项目已不存在，或重生成后的组装/校验/导出失败。
 
 ## GET /screenplays/{screenplay_id}/validation-report
 

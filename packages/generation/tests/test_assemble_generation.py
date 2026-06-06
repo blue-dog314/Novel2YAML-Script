@@ -11,6 +11,7 @@ from shared_types import (
     ChapterSummaryOutput,
     DialogueBlock,
     KeyEventOutput,
+    Location,
     ModelActionBlock,
     ModelDialogueBlock,
     ModelNoteBlock,
@@ -189,8 +190,69 @@ def test_duplicate_scene_content_raises() -> None:
 def test_character_table_populated_with_backend_ids() -> None:
     document = assemble_screenplay(**_kwargs())
     assert document.characters == [Character(character_id="char-alice", name="Alice")]
-    # Locations remain empty until G2b populates them.
+
+
+def test_location_table_populated_with_backend_ids() -> None:
+    document = assemble_screenplay(**_kwargs())
+    assert document.locations == [Location(location_id="loc-庭院", name="庭院")]
+
+
+def test_scene_references_location_id_and_keeps_display_name() -> None:
+    document = assemble_screenplay(**_kwargs())
+    scene = document.screenplay.scenes[0]
+    assert scene.location_id == "loc-庭院"
+    assert scene.location_name == "庭院"
+
+
+def test_scene_without_location_name_has_no_location_id() -> None:
+    plan = ScenePlanOutput(
+        scenes=[
+            ScenePlanItem(
+                title="无地点",
+                source_chapters=["ch-1", "ch-2", "ch-3"],
+                location_name=None,
+                summary="没有地点的场景。",
+            ),
+        ]
+    )
+    document = assemble_screenplay(
+        **_kwargs(scene_plan=plan, scene_contents=[_scene_content("sc-001")])
+    )
+    scene = document.screenplay.scenes[0]
+    assert scene.location_id is None
+    assert scene.location_name is None
     assert document.locations == []
+
+
+def test_location_ids_are_unique_and_deduplicated() -> None:
+    # "庭院" appears in chapter mentions and across both scenes; it must
+    # collapse to a single location entry with a unique id.
+    document = assemble_screenplay(
+        **_kwargs(
+            chapter_summaries=[
+                _chapter_summary(1),
+                _chapter_summary(2),
+                ChapterSummaryOutput(
+                    chapter_id="ch-3",
+                    title="第 3 章",
+                    summary="章节摘要。",
+                    key_events=[KeyEventOutput(text="事件 3", importance="high")],
+                    locations_mentioned=["庭院", "书房"],
+                ),
+            ]
+        )
+    )
+    ids = [location.location_id for location in document.locations]
+    assert ids == ["loc-庭院", "loc-书房"]
+    assert len(ids) == len(set(ids))
+
+
+def test_locations_deterministic() -> None:
+    first = assemble_screenplay(**_kwargs())
+    second = assemble_screenplay(**_kwargs())
+    assert [loc.model_dump(mode="json") for loc in first.locations] == [
+        loc.model_dump(mode="json") for loc in second.locations
+    ]
 
 
 def test_scene_and_dialogue_reference_character_ids() -> None:

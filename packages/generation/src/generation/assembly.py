@@ -19,6 +19,7 @@ from shared_types import (
     DialogueBlock,
     EmbeddedValidation,
     KeyEvent,
+    Location,
     Metadata,
     ModelActionBlock,
     ModelDialogueBlock,
@@ -70,6 +71,40 @@ class _CharacterRegistry:
         ]
 
 
+class _LocationRegistry:
+    """Backend-owned location id/name registry.
+
+    The model layer only emits location *names* (chapter ``locations_mentioned``,
+    scene-plan ``location_name``). The backend owns id assignment, mapping each
+    distinct name (casefolded) to a stable ``loc-<slug>`` id while preserving the
+    first-seen display name. This keeps ID ownership in the backend per CLAUDE.md
+    and lets the reference validator activate.
+    """
+
+    def __init__(self) -> None:
+        self._by_key: dict[str, tuple[str, str]] = {}
+        self._unnamed_counter = 0
+
+    def register(self, name: str) -> str:
+        key = name.strip().casefold()
+        existing = self._by_key.get(key)
+        if existing is not None:
+            return existing[0]
+        core = _slug_core(name)
+        if not core:
+            self._unnamed_counter += 1
+            core = f"unnamed-{self._unnamed_counter}"
+        location_id = f"loc-{core}"
+        self._by_key[key] = (location_id, name.strip())
+        return location_id
+
+    def locations(self) -> list[Location]:
+        return [
+            Location(location_id=location_id, name=display_name)
+            for location_id, display_name in self._by_key.values()
+        ]
+
+
 def assemble_screenplay(
     *,
     chapter_summaries: list[ChapterSummaryOutput],
@@ -87,16 +122,20 @@ def assemble_screenplay(
     content_by_scene_id = _index_scene_contents(scene_contents, scene_ids)
     chapters = _assemble_chapters(chapter_summaries)
     character_registry = _CharacterRegistry()
+    location_registry = _LocationRegistry()
     # Register chapter-mentioned characters first so ids follow chapter order,
     # then scene/dialogue names get registered during scene assembly below.
     for summary in chapter_summaries:
         for name in summary.characters_mentioned:
             character_registry.register(name)
+        for location_name in summary.locations_mentioned:
+            location_registry.register(location_name)
     scenes = _assemble_scenes(
         scene_plan,
         scene_ids,
         content_by_scene_id,
         character_registry,
+        location_registry,
     )
     return ScreenplayDraftDocument(
         metadata=_make_metadata(
@@ -110,7 +149,7 @@ def assemble_screenplay(
         adaptation_config=adaptation_config or AdaptationConfig(),
         chapters=chapters,
         characters=character_registry.characters(),
-        locations=[],
+        locations=location_registry.locations(),
         screenplay=Screenplay(scenes=scenes),
         adaptation_changes=[],
         validation=EmbeddedValidation(schema_version=SCREENPLAY_SCHEMA_VERSION),
@@ -212,10 +251,16 @@ def _assemble_scenes(
     scene_ids: list[str],
     content_by_scene_id: dict[str, SceneContentOutput],
     character_registry: _CharacterRegistry,
+    location_registry: _LocationRegistry,
 ) -> list[Scene]:
     scenes: list[Scene] = []
     for index, (scene_id, plan_item) in enumerate(zip(scene_ids, scene_plan.scenes, strict=True), start=1):
         content = content_by_scene_id[scene_id]
+        location_id = (
+            location_registry.register(plan_item.location_name)
+            if plan_item.location_name is not None
+            else None
+        )
         scenes.append(
             Scene(
                 scene_id=scene_id,
@@ -232,7 +277,7 @@ def _assemble_scenes(
                     )
                     for block_index, block in enumerate(content.content_blocks, start=1)
                 ],
-                location_id=None,
+                location_id=location_id,
                 location_name=plan_item.location_name,
                 time=plan_item.time,
                 characters=[

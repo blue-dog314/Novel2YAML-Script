@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import re
 from typing import NoReturn
 
 from exporters import export_validated_yaml
 from shared_types import (
     AdaptationConfig,
+    ChapterSummaryOutput,
     PipelineError,
     PipelineErrorType,
     PipelineStage,
+    SceneContentOutput,
+    ScenePlanOutput,
     ScreenplayDraftDocument,
     ValidationReport,
 )
@@ -146,6 +150,114 @@ def generate_screenplay_with_artifacts(
         scene_contents=scene_contents,
     )
 
+    document = _assemble_validate_export(
+        chapter_summaries=chapter_summaries,
+        scene_plan=scene_plan,
+        scene_contents=scene_contents,
+        project_id=project_id,
+        title=title,
+        original_author=original_author,
+        language=language,
+        model=model,
+        adaptation_config=adaptation_config,
+        artifacts=artifacts,
+    )
+
+    return document, artifacts
+
+
+def regenerate_scene(
+    *,
+    artifacts: GenerationArtifacts,
+    scene_id: str,
+    project_id: str,
+    title: str,
+    original_author: str,
+    language: str,
+    model: str,
+    llm: LLMClient,
+    adaptation_config: AdaptationConfig | None = None,
+) -> tuple[ScreenplayDraftDocument, GenerationArtifacts]:
+    """Regenerate one scene's content and deterministically reassemble the doc.
+
+    Given completed artifacts from a prior successful generation and a target
+    ``scene_id``, only that scene's content blocks are rewritten via the LLM.
+    Every other stage output (chapter summaries, scene plan, and the remaining
+    scene contents) is reused as-is, then the whole document is reassembled,
+    validated, and revalidated through the shared deterministic path.
+    """
+    if artifacts.scene_plan is None or artifacts.scene_contents is None:
+        _raise_pipeline_failure(
+            failed_stage="scene_content_generation",
+            error_type="model_output_invalid",
+            error_message=(
+                "Cannot regenerate a scene without a completed scene plan and "
+                "scene contents."
+            ),
+            retryable=False,
+            artifacts=artifacts,
+            suggested_action="Run a full generation first to produce reusable artifacts.",
+        )
+
+    scene_plan = artifacts.scene_plan
+    scene_contents = artifacts.scene_contents
+
+    if re.fullmatch(r"sc-\d{3}", scene_id) is None:
+        _raise_unknown_scene_id(scene_id, artifacts)
+    pos = int(scene_id[3:]) - 1
+    if pos < 0 or pos >= len(scene_plan.scenes):
+        _raise_unknown_scene_id(scene_id, artifacts)
+
+    try:
+        new_content = write_scene(scene_id, scene_plan.scenes[pos], llm)
+    except ModelOutputInvalid as exc:
+        _raise_model_output_failure(exc, artifacts)
+    except Exception as exc:
+        _raise_unexpected_stage_failure("scene_content_generation", exc, artifacts)
+
+    new_scene_contents = list(scene_contents)
+    new_scene_contents[pos] = new_content
+
+    new_artifacts = GenerationArtifacts(
+        chapter_summaries=artifacts.chapter_summaries,
+        scene_plan=scene_plan,
+        scene_contents=new_scene_contents,
+    )
+
+    document = _assemble_validate_export(
+        chapter_summaries=artifacts.chapter_summaries or [],
+        scene_plan=scene_plan,
+        scene_contents=new_scene_contents,
+        project_id=project_id,
+        title=title,
+        original_author=original_author,
+        language=language,
+        model=model,
+        adaptation_config=adaptation_config,
+        artifacts=new_artifacts,
+    )
+
+    return document, new_artifacts
+
+
+def _assemble_validate_export(
+    *,
+    chapter_summaries: list[ChapterSummaryOutput],
+    scene_plan: ScenePlanOutput,
+    scene_contents: list[SceneContentOutput],
+    project_id: str,
+    title: str,
+    original_author: str,
+    language: str,
+    model: str,
+    adaptation_config: AdaptationConfig | None,
+    artifacts: GenerationArtifacts,
+) -> ScreenplayDraftDocument:
+    """Deterministically assemble, validate, and revalidate a draft document.
+
+    Shared by the full-generation and single-scene-regeneration paths so both
+    emit identical ``failed_stage``/``error_type`` mappings on failure.
+    """
     try:
         document = assemble_screenplay(
             chapter_summaries=chapter_summaries,
@@ -193,7 +305,21 @@ def generate_screenplay_with_artifacts(
             suggested_action="Inspect exporter and schema compatibility before retrying.",
         )
 
-    return document, artifacts
+    return document
+
+
+def _raise_unknown_scene_id(
+    scene_id: str,
+    artifacts: GenerationArtifacts,
+) -> NoReturn:
+    _raise_pipeline_failure(
+        failed_stage="scene_content_generation",
+        error_type="model_output_invalid",
+        error_message=f"Unknown scene_id {scene_id!r}.",
+        retryable=False,
+        artifacts=artifacts,
+        suggested_action="Use a scene_id of the form 'sc-NNN' that exists in the scene plan.",
+    )
 
 
 def _scene_id(index: int) -> str:
@@ -309,4 +435,5 @@ __all__ = [
     "PipelineFailure",
     "generate_screenplay",
     "generate_screenplay_with_artifacts",
+    "regenerate_scene",
 ]

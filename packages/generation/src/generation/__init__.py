@@ -10,6 +10,7 @@ from .orchestrator import (
     PipelineFailure,
     generate_screenplay,
     generate_screenplay_with_artifacts,
+    regenerate_scene,
 )
 
 MODULE_NAME = "generation"
@@ -25,4 +26,5 @@ __all__ = [
     "assemble_screenplay",
     "generate_screenplay",
     "generate_screenplay_with_artifacts",
+    "regenerate_scene",
 ]

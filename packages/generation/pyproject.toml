@@ -5,10 +5,14 @@ description = "Generation pipeline: chapter summary, scene planning, scene writi
 requires-python = ">=3.12"
 dependencies = [
     "shared-types",
+    "validators",
+    "exporters",
 ]
 
 [tool.uv.sources]
 shared-types = { workspace = true }
+validators = { workspace = true }
+exporters = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

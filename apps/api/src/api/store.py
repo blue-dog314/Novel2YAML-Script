@@ -122,6 +122,24 @@ class InMemoryStore:
     def get_screenplay(self, screenplay_id: str) -> StoredScreenplay | None:
         return self._screenplays.get(screenplay_id)
 
+    def delete_project(self, project_id: str) -> bool:
+        """Delete a project together with its source text and derived artifacts.
+
+        Removes the project (including its stored chapter text), every job spawned
+        for it, and every generated screenplay. Returns ``False`` when the project
+        does not exist so the route can return 404.
+        """
+        if project_id not in self._projects:
+            return False
+        del self._projects[project_id]
+        self._jobs = {job_id: job for job_id, job in self._jobs.items() if job.project_id != project_id}
+        self._screenplays = {
+            screenplay_id: screenplay
+            for screenplay_id, screenplay in self._screenplays.items()
+            if screenplay.project_id != project_id
+        }
+        return True
+
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}-{uuid4().hex}"

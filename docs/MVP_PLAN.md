@@ -42,16 +42,21 @@ uploaded chapters
 - 章节列表不返回原文，只返回 `char_count`。
 - 少于 3 章不能进入生成闭环。
 
-## 下一阶段：P0a-lite-2
+## P0a-lite-2：作者编辑闭环
 
-后续应补充：
+已开始补充：
 
-1. YAML re-import validation endpoint。
-2. 作者编辑指南。
-3. 更完整的 `adaptation_changes` 编辑语义。
+1. YAML re-import validation endpoint: `POST /screenplays/validate-yaml`。
+2. 作者编辑指南: `docs/AUTHOR_EDITING_GUIDE.md` 和打包 `schema.md`。
+3. `adaptation_changes` 编辑语义: source chapter、affected scene 和 omitted key-event 规则。
 4. 更严格的章节覆盖和 key-event 覆盖验证。
-5. 生成前成本和风险提示。
-6. 删除支持和更明确的数据生命周期控制。
+5. 生成前成本和风险提示: `GET /projects/{project_id}/generation-notice`。
+
+仍需后续补充：
+
+1. 作者编辑后的 YAML 持久化/版本管理。
+2. 删除支持和更明确的数据生命周期控制。
+3. 前端编辑器或更完整的作者工作台。
 
 ## 更后续阶段
 

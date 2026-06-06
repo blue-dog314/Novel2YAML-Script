@@ -55,6 +55,10 @@ class GenerateRequest(BaseModel):
     adaptation_config: AdaptationConfig | None = None
 
 
+class SceneRegenerateRequest(BaseModel):
+    scene_id: str
+
+
 class ValidateYamlRequest(BaseModel):
     yaml: str
 

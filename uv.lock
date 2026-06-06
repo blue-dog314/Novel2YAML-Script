@@ -108,11 +108,17 @@ name = "generation"
 version = "0.1.0"
 source = { editable = "packages/generation" }
 dependencies = [
+    { name = "exporters" },
     { name = "shared-types" },
+    { name = "validators" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "shared-types", editable = "packages/shared_types" }]
+requires-dist = [
+    { name = "exporters", editable = "packages/exporters" },
+    { name = "shared-types", editable = "packages/shared_types" },
+    { name = "validators", editable = "packages/validators" },
+]
 
 [[package]]
 name = "iniconfig"

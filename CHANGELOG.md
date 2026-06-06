@@ -8,7 +8,12 @@
 ## [Unreleased]
 
 ### Added
-- 暂无
+- P0a-lite-2 作者编辑闭环入口：YAML re-import 校验、validation report 查询、schema doc 查询和生成前成本/风险提示。
+- 作者 YAML 编辑指南与 `adaptation_changes` 编辑语义文档。
+- OpenAI-compatible LLM client，支持环境变量配置 API key、model、base URL、timeout 和 retry。
+
+### Changed
+- validators 加严 `adaptation_changes` 引用校验和 key-event 覆盖校验。
 
 ## [0.1.0] - 2026-06-06
 

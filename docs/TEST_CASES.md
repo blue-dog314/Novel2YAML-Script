@@ -1,6 +1,6 @@
 # 测试用例
 
-本文档记录 P0a-lite-1 当前验收测试重点。实际自动化测试以 `pytest` 为准。
+本文档记录 P0a-lite 当前验收测试重点。实际自动化测试以 `pytest` 为准。
 
 ## 验证命令
 
@@ -53,7 +53,8 @@ uv run mypy apps/api/src apps/api/tests
 - 非法控制字符会失败。
 - Pydantic schema validation 会报告字段、类型、enum 错误。
 - 引用校验覆盖重复 ID、重复 order、未知 source chapter、未知 speaker/location。
-- 覆盖校验覆盖空章节、空场景、空 content_blocks、章节未覆盖。
+- 引用校验覆盖 `adaptation_changes[].source_chapters` 和 `adaptation_changes[].affected_scenes`。
+- 覆盖校验覆盖空章节、空场景、空 content_blocks、章节未覆盖、空 key events、被 omitted 章节仍保留 active key events。
 - final report 不应让 `coverage_validation_passed` 保持 `None`。
 
 ## exporters
@@ -77,6 +78,8 @@ uv run mypy apps/api/src apps/api/tests
 - 组装层负责 ID、order、speaker slug 和 YAML document 字段。
 - 生成结果通过 validate 和 export revalidation。
 - prompt 明确把源文本标记为 untrusted data，并使用边界分隔。
+- OpenAI-compatible LLM client 通过环境变量读取 key/model/base URL/timeout/retry 配置。
+- OpenAI-compatible LLM client 使用 chat completions JSON response format，并对临时网络错误重试。
 
 ## apps/api
 
@@ -88,6 +91,10 @@ uv run mypy apps/api/src apps/api/tests
 - 未确认章节时调用 generate 返回 409。
 - 不存在的 project/job/screenplay 返回 404。
 - happy path 生成 job 成功，并可查询 artifacts。
+- `GET /projects/{id}/generation-notice` 返回生成前成本与风险提示。
+- `POST /screenplays/validate-yaml` 可重新校验作者编辑后的 YAML。
+- `GET /screenplays/{id}/validation-report` 返回已生成 screenplay 的校验报告。
+- `GET /screenplays/{id}/schema-doc` 返回打包的 `schema.md`。
 - 少于 3 章生成返回 failed job，错误类型为 `chapter_count_insufficient`。
 - pipeline 中间阶段失败返回 failed job 和 `PipelineError`。
 - prompt-injection 文本原样作为不可信 payload 传入 generation prompt，不由 API 当作指令处理。

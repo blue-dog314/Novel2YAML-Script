@@ -87,3 +87,24 @@ API 将 pipeline 失败保存为 failed job，而不是伪装成成功 screenpla
 5. 更明确的上传大小限制。
 6. 更完整的审计日志，但不得默认记录全文。
 7. 外部 LLM provider 的密钥管理、超时、重试和数据保留策略。
+
+## 外部 LLM provider 配置
+
+默认 API 使用 `FakeLLMClient`，不会调用外部网络。设置
+`NOVEL_TO_SCREENPLAY_LLM_PROVIDER=openai` 后，API 会使用
+OpenAI-compatible chat completions provider。
+
+必填环境变量：
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+
+可选环境变量：
+
+- `OPENAI_BASE_URL`，默认 `https://api.openai.com/v1`
+- `OPENAI_TIMEOUT_SECONDS`，默认 `60`
+- `OPENAI_MAX_RETRIES`，默认 `2`
+
+启用外部 provider 后，章节正文会发送给 provider。不得把 API key 写入仓库、
+日志或 YAML artifacts；生产环境还需要补充 provider 数据保留策略、访问控制和
+审计配置。

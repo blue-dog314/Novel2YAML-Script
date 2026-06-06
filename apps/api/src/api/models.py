@@ -79,6 +79,8 @@ class JobResponse(BaseModel):
     project_id: str
     screenplay_id: str | None = None
     error: PipelineError | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class ArtifactsResponse(BaseModel):

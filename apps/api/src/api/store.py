@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
-from shared_types import PipelineError, ScreenplayDraftDocument, ValidationReport
+from generation import GenerationArtifacts
+from shared_types import AdaptationConfig, PipelineError, ScreenplayDraftDocument, ValidationReport
 
 JobStatus = Literal["running", "succeeded", "failed"]
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 @dataclass(frozen=True)
@@ -36,6 +42,11 @@ class StoredJob:
     status: JobStatus
     screenplay_id: str | None = None
     error: PipelineError | None = None
+    artifacts: GenerationArtifacts | None = None
+    model: str = "fake-model"
+    adaptation_config: AdaptationConfig | None = None
+    created_at: str = field(default_factory=_now_iso)
+    updated_at: str = field(default_factory=_now_iso)
 
 
 @dataclass(frozen=True)
@@ -45,6 +56,7 @@ class StoredScreenplay:
     yaml: str
     document: ScreenplayDraftDocument
     validation_report: ValidationReport
+    artifacts: GenerationArtifacts
 
 
 class InMemoryStore:
@@ -79,8 +91,20 @@ class InMemoryStore:
         project.chapters_confirmed = True
         return project
 
-    def create_job(self, *, project_id: str) -> StoredJob:
-        job = StoredJob(job_id=_new_id("job"), project_id=project_id, status="running")
+    def create_job(
+        self,
+        *,
+        project_id: str,
+        model: str = "fake-model",
+        adaptation_config: AdaptationConfig | None = None,
+    ) -> StoredJob:
+        job = StoredJob(
+            job_id=_new_id("job"),
+            project_id=project_id,
+            status="running",
+            model=model,
+            adaptation_config=adaptation_config,
+        )
         self._jobs[job.job_id] = job
         return job
 
@@ -89,13 +113,37 @@ class InMemoryStore:
         job.status = "succeeded"
         job.screenplay_id = screenplay_id
         job.error = None
+        job.updated_at = _now_iso()
         return job
 
-    def fail_job(self, *, job_id: str, error: PipelineError) -> StoredJob:
+    def fail_job(
+        self,
+        *,
+        job_id: str,
+        error: PipelineError,
+        artifacts: GenerationArtifacts | None = None,
+    ) -> StoredJob:
         job = self._jobs[job_id]
         job.status = "failed"
         job.error = error
         job.screenplay_id = None
+        job.artifacts = artifacts
+        job.updated_at = _now_iso()
+        return job
+
+    def start_retry(self, job_id: str) -> StoredJob | None:
+        """Move a failed job back to ``running`` for a retry attempt.
+
+        Keeps ``artifacts`` so the retry can resume from completed stages.
+        Returns ``None`` when the job does not exist so the route can 404.
+        """
+        job = self._jobs.get(job_id)
+        if job is None:
+            return None
+        job.status = "running"
+        job.error = None
+        job.screenplay_id = None
+        job.updated_at = _now_iso()
         return job
 
     def get_job(self, job_id: str) -> StoredJob | None:
@@ -108,6 +156,7 @@ class InMemoryStore:
         yaml: str,
         document: ScreenplayDraftDocument,
         validation_report: ValidationReport,
+        artifacts: GenerationArtifacts,
     ) -> StoredScreenplay:
         screenplay = StoredScreenplay(
             screenplay_id=_new_id("sp"),
@@ -115,6 +164,7 @@ class InMemoryStore:
             yaml=yaml,
             document=document,
             validation_report=validation_report,
+            artifacts=artifacts,
         )
         self._screenplays[screenplay.screenplay_id] = screenplay
         return screenplay

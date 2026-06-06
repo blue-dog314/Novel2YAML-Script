@@ -7,7 +7,7 @@ from importlib.resources import files
 import screenplay_schema
 from fastapi import APIRouter, Depends, HTTPException, status
 from exporters import export_validated_yaml
-from generation import ChapterInput, LLMClient, PipelineFailure, generate_screenplay
+from generation import ChapterInput, LLMClient, PipelineFailure, generate_screenplay_with_artifacts
 from shared_types import ValidationReport
 from validators import validate_yaml_text
 
@@ -30,13 +30,17 @@ def generate(
     if not project.chapters_confirmed:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Project chapters are not confirmed.")
 
-    job = store.create_job(project_id=project.project_id)
+    job = store.create_job(
+        project_id=project.project_id,
+        model=request.model,
+        adaptation_config=request.adaptation_config,
+    )
     chapters = [
         ChapterInput(chapter_id=chapter.chapter_id, title=chapter.title, text=chapter.text)
         for chapter in project.chapters
     ]
     try:
-        document = generate_screenplay(
+        document, artifacts = generate_screenplay_with_artifacts(
             chapters=chapters,
             project_id=project.project_id,
             title=project.title,
@@ -48,7 +52,7 @@ def generate(
         )
         yaml_text, validation_report = export_validated_yaml(document)
     except PipelineFailure as exc:
-        failed_job = store.fail_job(job_id=job.job_id, error=exc.error)
+        failed_job = store.fail_job(job_id=job.job_id, error=exc.error, artifacts=exc.artifacts)
         return JobResponse.model_validate(failed_job, from_attributes=True)
 
     screenplay = store.create_screenplay(
@@ -56,6 +60,7 @@ def generate(
         yaml=yaml_text,
         document=document,
         validation_report=validation_report,
+        artifacts=artifacts,
     )
     completed_job = store.complete_job(job_id=job.job_id, screenplay_id=screenplay.screenplay_id)
     return JobResponse.model_validate(completed_job, from_attributes=True)

@@ -44,7 +44,21 @@ Use this Skill when the user asks for any of the following:
 - privacy, copyright, or prompt-injection controls for uploaded novels
 - implementation tasks for P0a-lite-1, P0a-lite-2, P0a, or P0b
 
-## 3. Product boundaries
+## 3. PR submission requirements
+
+Use pull requests as the default delivery unit for new functionality.
+
+- Base new work on a feature branch and submit it as a PR before merging to `main`.
+- Each PR should do exactly one thing: implement or modify a single feature, contract layer, validator layer, exporter, generator stage, documentation change, or scaffold change.
+- Prefer small, fine-grained PRs. Split large features into multiple independent PRs that can be reviewed and merged step by step.
+- PR titles must state in one sentence what the PR adds or changes.
+- PR descriptions must clearly include:
+  - Feature description: what the feature does and how it is used.
+  - Implementation approach: the key technical choices or core logic.
+  - Test method: the commands or checks used to verify the feature works.
+- After every PR merge, `main` must remain runnable. Reviewers should be able to check out `main` at any time and reproduce the demo or run the documented validation commands.
+
+## 4. Product boundaries
 
 ### Target user
 

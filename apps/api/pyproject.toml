@@ -5,10 +5,16 @@ description = "FastAPI application for the novel-to-screenplay MVP"
 requires-python = ">=3.12"
 dependencies = [
     "shared-types",
+    "generation",
+    "exporters",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
 ]
 
 [tool.uv.sources]
 shared-types = { workspace = true }
+generation = { workspace = true }
+exporters = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

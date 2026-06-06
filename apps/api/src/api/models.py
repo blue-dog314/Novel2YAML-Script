@@ -64,6 +64,15 @@ class SchemaDocResponse(BaseModel):
     schema_doc: str
 
 
+class GenerationNoticeResponse(BaseModel):
+    project_id: str
+    chapter_count: int
+    total_char_count: int
+    estimated_scene_count: int
+    cost_notice: str
+    risk_notice: list[str]
+
+
 class JobResponse(BaseModel):
     job_id: str
     status: JobStatus

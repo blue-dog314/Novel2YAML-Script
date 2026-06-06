@@ -46,6 +46,7 @@ from .screenplay_document import (
     Scene,
     Screenplay,
     ScreenplayDraftDocument,
+    TimelineEntry,
     VoiceOverBlock,
 )
 from .validated import ValidatedScreenplay
@@ -100,6 +101,7 @@ __all__ = [
     "Location",
     "Scene",
     "Screenplay",
+    "TimelineEntry",
     "AdaptationChange",
     "Metadata",
     "AdaptationConfig",

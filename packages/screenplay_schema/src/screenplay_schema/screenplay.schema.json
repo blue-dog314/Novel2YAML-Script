@@ -706,6 +706,54 @@
       "title": "Screenplay",
       "type": "object"
     },
+    "TimelineEntry": {
+      "additionalProperties": false,
+      "description": "A single story-timeline entry.\n\nBackend-owned: the backend derives the timeline deterministically from\nchapter key events (it owns ``entry_id`` and the ``related_scenes`` link).\n``time`` is optional free text since P0a does not yet model absolute time.\n``source_chapters`` records provenance; ``related_scenes`` lists the scenes\nthat cover those chapters and is validated against known scene ids.",
+      "properties": {
+        "entry_id": {
+          "title": "Entry Id",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Time"
+        },
+        "source_chapters": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Chapters",
+          "type": "array"
+        },
+        "related_scenes": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Scenes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "entry_id",
+        "description"
+      ],
+      "title": "TimelineEntry",
+      "type": "object"
+    },
     "VoiceOverBlock": {
       "additionalProperties": false,
       "description": "A voice-over block.",
@@ -774,6 +822,14 @@
     "screenplay": {
       "$ref": "#/$defs/Screenplay"
     },
+    "timeline": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/TimelineEntry"
+      },
+      "title": "Timeline",
+      "type": "array"
+    },
     "adaptation_changes": {
       "default": [],
       "items": {
@@ -804,5 +860,5 @@
   "type": "object",
   "$id": "novel-to-screenplay.screenplay.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "x-schema-version": "0.1.0"
+  "x-schema-version": "0.2.0"
 }

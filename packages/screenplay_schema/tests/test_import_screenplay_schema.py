@@ -23,6 +23,7 @@ EXPECTED_TOP_LEVEL_PROPERTIES = [
     "characters",
     "locations",
     "screenplay",
+    "timeline",
     "adaptation_changes",
     "validation",
     "revision_notes",

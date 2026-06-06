@@ -18,6 +18,7 @@ from shared_types import (
     Scene,
     Screenplay,
     ScreenplayDraftDocument,
+    TimelineEntry,
     ValidatedScreenplay,
 )
 
@@ -399,3 +400,71 @@ def test_validate_and_mark_rejects_failed_coverage() -> None:
 def test_shared_types_still_rejects_invalid_metadata() -> None:
     with pytest.raises(ValidationError):
         _metadata(source_chapter_count=2)
+
+
+def test_valid_timeline_passes_reference_validation() -> None:
+    timeline = [
+        TimelineEntry(
+            entry_id="ch-1-tl-001",
+            description="An event.",
+            source_chapters=["ch-1"],
+            related_scenes=["sc-1"],
+        ),
+        TimelineEntry(
+            entry_id="ch-2-tl-001",
+            description="Another event.",
+            source_chapters=["ch-2", "ch-3"],
+            related_scenes=["sc-1"],
+        ),
+    ]
+    report = validate_document(_draft(timeline=timeline))
+    assert report.reference_validation_passed is True
+    assert report.errors == []
+
+
+def test_unknown_timeline_source_chapter_fails_reference_validation() -> None:
+    timeline = [
+        TimelineEntry(
+            entry_id="tl-1",
+            description="An event.",
+            source_chapters=["missing"],
+            related_scenes=["sc-1"],
+        )
+    ]
+    report = validate_document(_draft(timeline=timeline))
+    assert report.reference_validation_passed is False
+    assert any(error.code == "UNKNOWN_TIMELINE_SOURCE_CHAPTER" for error in report.errors)
+
+
+def test_unknown_timeline_scene_fails_reference_validation() -> None:
+    timeline = [
+        TimelineEntry(
+            entry_id="tl-1",
+            description="An event.",
+            source_chapters=["ch-1"],
+            related_scenes=["missing-scene"],
+        )
+    ]
+    report = validate_document(_draft(timeline=timeline))
+    assert report.reference_validation_passed is False
+    assert any(error.code == "UNKNOWN_TIMELINE_SCENE" for error in report.errors)
+
+
+def test_duplicate_timeline_entry_id_fails_reference_validation() -> None:
+    timeline = [
+        TimelineEntry(
+            entry_id="tl-1",
+            description="An event.",
+            source_chapters=["ch-1"],
+            related_scenes=["sc-1"],
+        ),
+        TimelineEntry(
+            entry_id="tl-1",
+            description="Another event.",
+            source_chapters=["ch-2"],
+            related_scenes=["sc-1"],
+        ),
+    ]
+    report = validate_document(_draft(timeline=timeline))
+    assert report.reference_validation_passed is False
+    assert any(error.code == "DUPLICATE_TIMELINE_ENTRY_ID" for error in report.errors)

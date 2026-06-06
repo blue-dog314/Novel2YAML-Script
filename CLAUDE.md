@@ -20,6 +20,20 @@ uv build --all-packages
 
 To build distributions, always use `uv build --all-packages` from the repo root. Do NOT run a bare `uv build` at the root: the workspace root is not a distributable package (`[tool.uv] package = false`), and a bare `uv build` will try to build the root directory itself and fail with a setuptools flat-layout error (`Multiple top-level packages discovered: ['apps', 'packages']`). This is expected uv behavior, not a misconfiguration. CI and delivery docs should call `uv build --all-packages` (or build individual members with `uv build --package <name>`).
 
+## PR submission requirements
+
+All new functionality should be delivered through pull requests.
+
+- Base new work on a feature branch and submit it as a PR before merging to `main`.
+- Each PR should do exactly one thing: implement or modify a single feature, contract layer, validator layer, exporter, generator stage, documentation change, or scaffold change.
+- Prefer small, fine-grained PRs. Split large features into multiple independent PRs that can be reviewed and merged step by step.
+- PR titles must state in one sentence what the PR adds or changes.
+- PR descriptions must clearly include:
+  - Feature description: what the feature does and how it is used.
+  - Implementation approach: the key technical choices or core logic.
+  - Test method: the commands or checks used to verify the feature works.
+- After every PR merge, `main` must remain runnable. Reviewers should be able to check out `main` at any time and reproduce the demo or run the documented validation commands.
+
 ## Product architecture direction
 
 The project is an AI-assisted tool for novel authors. Its P0a-lite goal is to convert 3 or more chapters of novel text into a structured, editable, schema-validated screenplay YAML draft.

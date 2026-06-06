@@ -1,6 +1,6 @@
 # Screenplay YAML Schema
 
-Version: `0.2.0`
+Version: `0.3.0`
 
 This document summarizes the P0a-lite screenplay document schema. The authoritative machine-readable schema is packaged as `screenplay.schema.json` and is generated from `shared_types.ScreenplayDraftDocument`.
 
@@ -15,9 +15,10 @@ The screenplay document uses these required top-level fields:
 5. `locations`
 6. `screenplay`
 7. `timeline`
-8. `adaptation_changes`
-9. `validation`
-10. `revision_notes`
+8. `story_bible`
+9. `adaptation_changes`
+10. `validation`
+11. `revision_notes`
 
 ## Required metadata
 
@@ -44,6 +45,10 @@ Supported content block types:
 ## Timeline
 
 `timeline` is a backend-derived list of story events. Each entry has `entry_id`, `description`, an optional `time` (free text in P0a), `source_chapters` (provenance), and `related_scenes` (the scenes covering those chapters). Runtime validators check that `source_chapters` reference known chapters and `related_scenes` reference known scenes.
+
+## Story Bible
+
+`story_bible` is a backend-derived overview, not a data source. It is computed deterministically by aggregating the `characters` and `locations` tables across the scenes that reference them; it introduces no data the model produced. It holds `characters` (each a `character_id`, `name`, and the `scene_ids` whose `characters` include that id, in scene order) and `locations` (each a `location_id`, `name`, and the `scene_ids` set there). Runtime validators check that each `character_id`/`location_id` exists in the corresponding table and that every `scene_ids` entry references a known scene.
 
 ## Author editing guide
 

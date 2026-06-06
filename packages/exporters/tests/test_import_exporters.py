@@ -31,6 +31,7 @@ EXPECTED_TOP_LEVEL_ORDER = [
     "locations",
     "screenplay",
     "timeline",
+    "story_bible",
     "adaptation_changes",
     "validation",
     "revision_notes",

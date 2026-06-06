@@ -15,11 +15,13 @@ from shared_types import (
     AdaptationConfig,
     Chapter,
     Character,
+    CharacterProfile,
     ChapterSummaryOutput,
     DialogueBlock,
     EmbeddedValidation,
     KeyEvent,
     Location,
+    LocationProfile,
     Metadata,
     ModelActionBlock,
     ModelDialogueBlock,
@@ -31,6 +33,7 @@ from shared_types import (
     ScenePlanOutput,
     Screenplay,
     ScreenplayDraftDocument,
+    StoryBible,
     TimelineEntry,
     VoiceOverBlock,
 )
@@ -139,6 +142,8 @@ def assemble_screenplay(
         location_registry,
     )
     timeline = _assemble_timeline(chapter_summaries, scenes)
+    characters = character_registry.characters()
+    locations = location_registry.locations()
     return ScreenplayDraftDocument(
         metadata=_make_metadata(
             project_id=project_id,
@@ -150,10 +155,11 @@ def assemble_screenplay(
         ),
         adaptation_config=adaptation_config or AdaptationConfig(),
         chapters=chapters,
-        characters=character_registry.characters(),
-        locations=location_registry.locations(),
+        characters=characters,
+        locations=locations,
         screenplay=Screenplay(scenes=scenes),
         timeline=timeline,
+        story_bible=_assemble_story_bible(characters, locations, scenes),
         adaptation_changes=[],
         validation=EmbeddedValidation(schema_version=SCREENPLAY_SCHEMA_VERSION),
         revision_notes=[],
@@ -253,6 +259,45 @@ def _assemble_timeline(
                 )
             )
     return timeline
+
+
+def _assemble_story_bible(
+    characters: list[Character],
+    locations: list[Location],
+    scenes: list[Scene],
+) -> StoryBible:
+    """Derive a deterministic Story Bible overview from assembled tables.
+
+    P0a "story bible" is a backend-owned aggregation, not a new LLM stage. For
+    each character (in table order) it collects the scenes (in scene order)
+    whose ``characters`` include that id; for each location it collects the
+    scenes whose ``location_id`` matches. It introduces no new data.
+    """
+    character_profiles = [
+        CharacterProfile(
+            character_id=character.character_id,
+            name=character.name,
+            scene_ids=[
+                scene.scene_id
+                for scene in scenes
+                if character.character_id in scene.characters
+            ],
+        )
+        for character in characters
+    ]
+    location_profiles = [
+        LocationProfile(
+            location_id=location.location_id,
+            name=location.name,
+            scene_ids=[
+                scene.scene_id
+                for scene in scenes
+                if scene.location_id == location.location_id
+            ],
+        )
+        for location in locations
+    ]
+    return StoryBible(characters=character_profiles, locations=location_profiles)
 
 
 def _assemble_content_block(

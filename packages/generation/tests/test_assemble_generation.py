@@ -336,3 +336,28 @@ def test_timeline_is_deterministic() -> None:
     assert [e.model_dump(mode="json") for e in first.timeline] == [
         e.model_dump(mode="json") for e in second.timeline
     ]
+
+
+def test_story_bible_derived_from_assembled_tables() -> None:
+    # Both fixture scenes reference character "Alice" (-> char-alice) and are
+    # set in "庭院" (-> loc-庭院), so each profile collects both scene ids.
+    document = assemble_screenplay(**_kwargs())
+    assert [profile.character_id for profile in document.story_bible.characters] == ["char-alice"]
+    alice = document.story_bible.characters[0]
+    assert alice.name == "Alice"
+    assert alice.scene_ids == ["sc-001", "sc-002"]
+    assert [profile.location_id for profile in document.story_bible.locations] == ["loc-庭院"]
+    courtyard = document.story_bible.locations[0]
+    assert courtyard.name == "庭院"
+    assert courtyard.scene_ids == ["sc-001", "sc-002"]
+
+
+def test_story_bible_is_deterministic() -> None:
+    first = assemble_screenplay(**_kwargs())
+    second = assemble_screenplay(**_kwargs())
+    assert first.story_bible.model_dump(mode="json") == second.story_bible.model_dump(mode="json")
+
+
+def test_assembled_story_bible_passes_validators() -> None:
+    report = validate_document(assemble_screenplay(**_kwargs()))
+    assert report.reference_validation_passed is True

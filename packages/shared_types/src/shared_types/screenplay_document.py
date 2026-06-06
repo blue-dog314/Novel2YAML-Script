@@ -195,6 +195,48 @@ class TimelineEntry(BaseModel):
     related_scenes: list[str] = []
 
 
+# --- story bible (P0a) -----------------------------------------------------
+
+
+class CharacterProfile(BaseModel):
+    """Story-bible profile: a character and the scenes they appear in.
+
+    Backend-derived from the assembled characters table and scene references;
+    no new LLM stage. ``scene_ids`` lists scenes whose ``characters`` include
+    this character id, in scene order.
+    """
+
+    model_config = FORBID_EXTRA_CONFIG
+
+    character_id: str
+    name: str
+    scene_ids: list[str] = []
+
+
+class LocationProfile(BaseModel):
+    """Story-bible profile: a location and the scenes set there."""
+
+    model_config = FORBID_EXTRA_CONFIG
+
+    location_id: str
+    name: str
+    scene_ids: list[str] = []
+
+
+class StoryBible(BaseModel):
+    """Backend-derived overview aggregating characters and locations across scenes.
+
+    Minimal P0a aggregation: it is computed deterministically from the
+    characters/locations tables and the scenes that reference them. It owns no
+    new data the model produced.
+    """
+
+    model_config = FORBID_EXTRA_CONFIG
+
+    characters: list[CharacterProfile] = []
+    locations: list[LocationProfile] = []
+
+
 # --- adaptation changes ----------------------------------------------------
 
 
@@ -297,6 +339,7 @@ class ScreenplayDraftDocument(BaseModel):
     locations: list[Location] = []
     screenplay: Screenplay
     timeline: list[TimelineEntry] = []
+    story_bible: StoryBible = StoryBible()
     adaptation_changes: list[AdaptationChange] = []
     validation: EmbeddedValidation
     revision_notes: list[RevisionNote] = []

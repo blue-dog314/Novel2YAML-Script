@@ -9,6 +9,7 @@ from ..models import (
     ChapterSummaryResponse,
     ChaptersResponse,
     ConfirmChaptersResponse,
+    GenerationNoticeResponse,
     ProjectCreateRequest,
     ProjectResponse,
 )
@@ -69,6 +70,36 @@ def confirm_chapters(
         project_id=project.project_id,
         chapters_confirmed=project.chapters_confirmed,
         chapter_count=len(project.chapters),
+    )
+
+
+@router.get("/{project_id}/generation-notice", response_model=GenerationNoticeResponse)
+def get_generation_notice(
+    project_id: str,
+    store: InMemoryStore = Depends(get_store),
+) -> GenerationNoticeResponse:
+    project = _get_project_or_404(store, project_id)
+    total_char_count = sum(len(chapter.text) for chapter in project.chapters)
+    estimated_scene_count = max(1, min(len(project.chapters) * 2, 24))
+    risk_notice = [
+        "Generation sends chapter text to the configured LLM provider.",
+        "Source text is treated as untrusted data, but model output can still require author review.",
+        "Large chapters can increase latency and provider cost.",
+    ]
+    if len(project.chapters) < 3:
+        risk_notice.append("At least three confirmed chapters are required before generation can succeed.")
+    if not project.chapters_confirmed:
+        risk_notice.append("Confirm chapters before starting generation.")
+    return GenerationNoticeResponse(
+        project_id=project.project_id,
+        chapter_count=len(project.chapters),
+        total_char_count=total_char_count,
+        estimated_scene_count=estimated_scene_count,
+        cost_notice=(
+            "Cost depends on provider pricing, chapter length, retry count, and the number "
+            "of generated scenes; this local MVP does not estimate currency cost."
+        ),
+        risk_notice=risk_notice,
     )
 
 

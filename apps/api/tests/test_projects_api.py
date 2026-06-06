@@ -61,6 +61,35 @@ def test_confirm_chapters_is_idempotent(client: TestClient) -> None:
     assert second.json()["chapters_confirmed"] is True
 
 
+def test_generation_notice_summarizes_cost_and_risks(client: TestClient) -> None:
+    create_response = client.post(
+        "/projects",
+        json={
+            "title": "测试小说",
+            "original_author": "作者",
+            "language": "zh",
+            "rights_confirmed": True,
+            "chapters": [
+                {"title": "第一章", "text": "正文一"},
+                {"title": "第二章", "text": "正文二二"},
+                {"title": "第三章", "text": "正文三三三"},
+            ],
+        },
+    )
+    project_id = create_response.json()["project_id"]
+
+    notice_response = client.get(f"/projects/{project_id}/generation-notice")
+
+    assert notice_response.status_code == 200
+    notice = notice_response.json()
+    assert notice["project_id"] == project_id
+    assert notice["chapter_count"] == 3
+    assert notice["total_char_count"] == len("正文一正文二二正文三三三")
+    assert notice["estimated_scene_count"] == 6
+    assert "provider pricing" in notice["cost_notice"]
+    assert any("Confirm chapters" in item for item in notice["risk_notice"])
+
+
 def test_unknown_project_returns_404(client: TestClient) -> None:
     response = client.get("/projects/missing/chapters")
 

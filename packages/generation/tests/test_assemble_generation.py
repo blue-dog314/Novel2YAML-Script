@@ -7,7 +7,9 @@ from typing import Any
 import pytest
 from exporters import export_validated_yaml
 from shared_types import (
+    Character,
     ChapterSummaryOutput,
+    DialogueBlock,
     KeyEventOutput,
     ModelActionBlock,
     ModelDialogueBlock,
@@ -184,10 +186,45 @@ def test_duplicate_scene_content_raises() -> None:
         assemble_screenplay(**_kwargs(scene_contents=[_scene_content("sc-001"), _scene_content("sc-001")]))
 
 
-def test_empty_character_and_location_tables() -> None:
+def test_character_table_populated_with_backend_ids() -> None:
     document = assemble_screenplay(**_kwargs())
-    assert document.characters == []
+    assert document.characters == [Character(character_id="char-alice", name="Alice")]
+    # Locations remain empty until G2b populates them.
     assert document.locations == []
+
+
+def test_scene_and_dialogue_reference_character_ids() -> None:
+    document = assemble_screenplay(**_kwargs())
+    scene = document.screenplay.scenes[0]
+    # scene.characters carries backend ids, not raw names.
+    assert scene.characters == ["char-alice"]
+    dialogue = scene.content_blocks[1]
+    assert isinstance(dialogue, DialogueBlock)
+    assert dialogue.speaker == "char-alice"
+    assert dialogue.speaker_name == "Alice"
+
+
+def test_character_ids_are_unique_and_deduplicated() -> None:
+    # "Alice" appears in chapter mentions, scene characters, and dialogue;
+    # it must collapse to a single character entry.
+    document = assemble_screenplay(
+        **_kwargs(
+            chapter_summaries=[
+                _chapter_summary(1),
+                _chapter_summary(2),
+                ChapterSummaryOutput(
+                    chapter_id="ch-3",
+                    title="第 3 章",
+                    summary="章节摘要。",
+                    key_events=[KeyEventOutput(text="事件 3", importance="high")],
+                    characters_mentioned=["Alice", "Bob"],
+                ),
+            ]
+        )
+    )
+    ids = [character.character_id for character in document.characters]
+    assert ids == ["char-alice", "char-bob"]
+    assert len(ids) == len(set(ids))
 
 
 def test_validation_block_is_draft_state() -> None:

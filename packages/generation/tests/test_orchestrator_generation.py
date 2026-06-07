@@ -20,6 +20,7 @@ from generation.prompts import (
     SOURCE_TEXT_BEGIN,
     SOURCE_TEXT_END,
     build_chapter_summary_prompt,
+    build_scene_content_prompt,
     build_scene_plan_prompt,
 )
 from generation.repair import ModelOutputInvalid
@@ -372,4 +373,25 @@ def test_scene_plan_prompt_constrains_single_location_and_clean_names() -> None:
     assert (
         "Each entry in a scene's characters list must be a single clean "
         "proper name with no parenthetical notes or status suffixes." in user
+    )
+
+
+def test_scene_content_prompt_constrains_clean_speaker_name() -> None:
+    from shared_types import ScenePlanItem
+
+    plan_item = ScenePlanItem(
+        title="Scene",
+        source_chapters=["ch-1"],
+        location_name="A place",
+        time=None,
+        characters=["Alice"],
+        dramatic_goal="goal",
+        conflict="conflict",
+        summary="summary",
+    )
+    _system, user = build_scene_content_prompt(scene_id="sc-001", plan_item=plan_item)
+
+    assert (
+        "Each dialogue block's speaker_name must be a single clean proper "
+        "name with no parenthetical notes or status suffixes" in user
     )

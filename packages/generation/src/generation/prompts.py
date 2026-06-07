@@ -134,6 +134,11 @@ def build_scene_content_prompt(
                     "entry citing its event_id, the fidelity_status, and the 1-based "
                     "covered_by_block_index of the block that covers it."
                 ),
+                (
+                    "Each dialogue block's speaker_name must be a single clean proper "
+                    "name with no parenthetical notes or status suffixes (for example "
+                    "no '(mentioned)', '(vision/memory)', or '(recollection)')."
+                ),
                 _json_block(payload),
                 "Return only the JSON object.",
             ]

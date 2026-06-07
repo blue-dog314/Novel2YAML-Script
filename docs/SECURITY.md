@@ -38,13 +38,13 @@ P0a-lite-1 使用进程内内存存储。
 - `GET /projects/{id}/chapters` 不返回章节原文，只返回 `char_count`。
 - 生成 artifacts 返回 screenplay YAML、backend document 和 validation report。
 - 默认日志策略不应记录完整源文本。
+- `DELETE /projects/{id}` 级联删除项目及其存储的章节原文、关联 job 与已生成 screenplay，提供源文本的删除能力（项目不存在时返回 404）。
 
 当前限制：
 
 - 尚未实现用户鉴权。
 - 尚未实现数据库隔离。
-- 尚未实现删除接口。
-- 尚未实现源文本、生成结果和日志的分离式持久化。
+- 删除目前仅作用于内存存储；尚未实现源文本、生成结果和日志的分离式持久化与各自独立的删除/访问控制。
 
 这些限制应在进入非本地演示环境前补齐。
 

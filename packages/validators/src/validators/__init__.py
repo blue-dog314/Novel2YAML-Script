@@ -22,6 +22,14 @@ MODULE_NAME = "validators"
 
 _CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
+# Punctuation separators that join multiple locations into one name. The
+# entity-cleaning prompt forbids '、', ',', '，', and '/' in a scene's
+# location_name; this is the deterministic backstop. Conjunction words like
+# "及"/"和" are intentionally NOT matched here because they appear in many
+# legitimate single-location names; semantic splitting belongs to the P0a
+# story-bible layer, not this deterministic check.
+_LOCATION_NAME_SEPARATOR_RE = re.compile(r"[、，,/]")
+
 
 def validate_yaml_text(yaml_text: str) -> tuple[ScreenplayDraftDocument | None, ValidationReport]:
     """Validate YAML text through syntax, schema, reference, and coverage layers."""
@@ -201,6 +209,20 @@ def _validate_references(document: ScreenplayDraftDocument) -> list[ValidationEr
                     "UNKNOWN_LOCATION",
                     f"scene references unknown location {scene.location_id!r}",
                     f"{scene_path}.location_id",
+                )
+            )
+
+        if scene.location_name is not None and _LOCATION_NAME_SEPARATOR_RE.search(
+            scene.location_name
+        ):
+            errors.append(
+                _issue(
+                    "LOCATION_NAME_NOT_SINGLE",
+                    (
+                        f"scene location_name {scene.location_name!r} joins multiple "
+                        f"locations; each scene must name a single location"
+                    ),
+                    f"{scene_path}.location_name",
                 )
             )
 

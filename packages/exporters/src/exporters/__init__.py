@@ -20,6 +20,15 @@ def _represent_none(representer: Any, data: None) -> Any:
     return representer.represent_scalar("tag:yaml.org,2002:null", "null")
 
 
+def _represent_str(representer: Any, data: str) -> Any:
+    # Render multi-line text as an author-friendly literal block scalar (`|-`)
+    # so embedded newlines are written as real indented lines instead of escaped
+    # `\n` sequences. Short single-line strings keep the default scalar style.
+    if "\n" in data:
+        return representer.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+    return representer.represent_scalar("tag:yaml.org,2002:str", data)
+
+
 def _make_yaml() -> YAML:
     yaml = YAML()
     yaml.allow_unicode = True
@@ -27,6 +36,7 @@ def _make_yaml() -> YAML:
     setattr(yaml, "sort_base_mapping_type_on_output", False)
     yaml.indent(mapping=2, sequence=4, offset=2)
     yaml.representer.add_representer(type(None), _represent_none)
+    yaml.representer.add_representer(str, _represent_str)
     return yaml
 
 

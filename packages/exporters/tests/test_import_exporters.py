@@ -149,6 +149,54 @@ def test_export_validated_yaml_raises_for_invalid_document() -> None:
         export_validated_yaml(_draft(screenplay=Screenplay(scenes=[])))
 
 
+def _draft_with_multiline_text() -> ScreenplayDraftDocument:
+    scene = Scene(
+        scene_id="sc-1",
+        order=1,
+        title="开场",
+        source_chapters=["ch-1", "ch-2", "ch-3"],
+        summary="Alice 问候。",
+        content_blocks=[
+            DialogueBlock(
+                block_id="b-1",
+                order=1,
+                speaker="char-1",
+                speaker_name="Alice",
+                line="第一句。\n第二句。",
+            )
+        ],
+    )
+    return _draft(screenplay=Screenplay(scenes=[scene]))
+
+
+def test_export_yaml_uses_literal_block_for_multiline_text() -> None:
+    yaml_text = export_yaml(_draft_with_multiline_text())
+    # The multi-line field must be a literal block scalar, not an escaped
+    # single-line double-quoted string.
+    assert "line: |-" in yaml_text
+    assert "\\n" not in yaml_text
+    assert "    第一句。" in yaml_text
+    assert "    第二句。" in yaml_text
+    # Round-trip preserves the exact text content.
+    data = _load_yaml(yaml_text)
+    block = data["screenplay"]["scenes"][0]["content_blocks"][0]
+    assert block["line"] == "第一句。\n第二句。"
+
+
+def test_export_yaml_keeps_single_line_text_as_plain_scalar() -> None:
+    yaml_text = export_yaml(_draft())
+    # Short single-line fields stay as ordinary scalars, never forced to blocks.
+    assert "summary: 故事继续推进。" in yaml_text
+    assert "summary: |" not in yaml_text
+    assert "line: 你好。" in yaml_text
+
+
+def test_export_validated_yaml_succeeds_with_multiline_text() -> None:
+    yaml_text, report = export_validated_yaml(_draft_with_multiline_text())
+    assert "line: |-" in yaml_text
+    assert report.errors == []
+
+
 def test_field_order_follows_contract() -> None:
     yaml_text = export_yaml(_draft())
     top_level_fields = [

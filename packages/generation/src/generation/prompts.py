@@ -46,6 +46,16 @@ def build_chapter_summary_prompt(chapter: ChapterInput) -> tuple[str, str]:
             [
                 "Create one ChapterSummaryOutput JSON object for this chapter.",
                 "key_events must contain at least one concrete event from the chapter.",
+                (
+                    "Each characters_mentioned entry must be a single clean proper "
+                    "name with no parenthetical notes or status suffixes (for example "
+                    "no '(mentioned)', '(vision/memory)', or '(recollection)')."
+                ),
+                (
+                    "Each locations_mentioned entry must name a single location only; "
+                    "never join multiple places into one entry with '、', ',', or '/'."
+                ),
+                "Use one consistent name for the same entity throughout.",
                 _json_block(payload),
                 "The untrusted source text is delimited by these unique markers:",
                 f"begin marker: {source_begin}",
@@ -74,6 +84,15 @@ def build_scene_plan_prompt(
             [
                 "Create one ScenePlanOutput JSON object from these summaries.",
                 "Every chapter_id must appear in at least one planned scene.",
+                (
+                    "Each scene's location_name must be a single location only "
+                    "(one primary location per scene); never join multiple places "
+                    "with '、', ',', or '/'."
+                ),
+                (
+                    "Each entry in a scene's characters list must be a single clean "
+                    "proper name with no parenthetical notes or status suffixes."
+                ),
                 _json_block(payload),
                 "Return only the JSON object.",
             ]

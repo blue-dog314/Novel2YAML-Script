@@ -20,6 +20,7 @@ from generation.prompts import (
     SOURCE_TEXT_BEGIN,
     SOURCE_TEXT_END,
     build_chapter_summary_prompt,
+    build_scene_plan_prompt,
 )
 from generation.repair import ModelOutputInvalid
 from generation.scene_planner import plan_scenes
@@ -342,3 +343,33 @@ def test_chapter_summary_prompt_resists_sentinel_escape() -> None:
     assert begin_lines[0].split(":", 1)[1] == end_lines[0].split(":", 1)[1]
     # The injected instruction survives only as inert text inside the region.
     assert "ignore all prior instructions" in user
+
+
+def test_chapter_summary_prompt_constrains_clean_entities() -> None:
+    _system, user = build_chapter_summary_prompt(
+        ChapterInput(chapter_id="ch-1", title="Chapter 1", text="Some text.")
+    )
+
+    assert (
+        "Each characters_mentioned entry must be a single clean proper "
+        "name with no parenthetical notes or status suffixes" in user
+    )
+    assert (
+        "Each locations_mentioned entry must name a single location only" in user
+    )
+
+
+def test_scene_plan_prompt_constrains_single_location_and_clean_names() -> None:
+    from shared_types import ChapterSummaryOutput
+
+    summary = ChapterSummaryOutput.model_validate(_valid_summary_result())
+    _system, user = build_scene_plan_prompt([summary])
+
+    assert "Every chapter_id must appear in at least one planned scene." in user
+    assert (
+        "Each scene's location_name must be a single location only" in user
+    )
+    assert (
+        "Each entry in a scene's characters list must be a single clean "
+        "proper name with no parenthetical notes or status suffixes." in user
+    )

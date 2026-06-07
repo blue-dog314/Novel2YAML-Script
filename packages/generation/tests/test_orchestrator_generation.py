@@ -420,3 +420,14 @@ def test_scene_content_prompt_requires_performable_richness() -> None:
     assert "Do not restate the plan or summarize the plot." in user
     assert "at least four blocks" in user
     assert "at least two dialogue blocks" in user
+
+
+def test_scene_plan_prompt_scales_scenes_with_density() -> None:
+    summaries = summarize_chapters(_chapters(), FakeLLMClient())
+
+    _system, user = build_scene_plan_prompt(summaries)
+
+    assert "Scale the number of scenes" in user
+    assert "key_events count" in user
+    assert "One chapter may map to several scenes" in user
+    assert "Every chapter_id must appear in at least one planned scene." in user

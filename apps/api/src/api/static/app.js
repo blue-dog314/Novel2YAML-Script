@@ -227,6 +227,10 @@ const App = {
       return d && d.screenplay && d.screenplay.scenes ? d.screenplay.scenes : [];
     });
     const report = computed(() => artifacts.value ? artifacts.value.validation_report : null);
+    const reportEmpty = computed(() => {
+      const r = report.value;
+      return !!r && r.errors.length === 0 && r.warnings.length === 0;
+    });
     const canConfirm = computed(() => project.value && !project.value.chapters_confirmed);
     const canGenerate = computed(() => project.value && project.value.chapters_confirmed);
     const jobFailed = computed(() => job.value && job.value.status === "failed");
@@ -235,7 +239,7 @@ const App = {
     return {
       toast, form, project, busy, chapters, notice, gen, job, artifacts,
       history, activeScreenplayId, yamlInput, yamlReport, schemaDoc,
-      scenes, report, canConfirm, canGenerate, jobFailed, canRetry,
+      scenes, report, canConfirm, canGenerate, jobFailed, canRetry, reportEmpty,
       addChapter, removeChapter, createProject, loadChapters, confirmChapters,
       loadNotice, generate, retryJob, regenerateScene, switchScreenplay,
       validateYaml, copyYaml, useGeneratedYaml, loadSchemaDoc,
@@ -367,7 +371,7 @@ const App = {
           <div v-if="report.suggested_fixes.length">
             <div v-for="(f, i) in report.suggested_fixes" :key="'f'+i" class="report-line muted">💡 {{ f }}</div>
           </div>
-          <p v-if="!report.errors.length && !report.warnings.length" class="muted">无错误、无警告。</p>
+          <p v-if="reportEmpty" class="muted">无错误、无警告。</p>
         </div>
         <div class="spacer" v-if="report"></div>
         <div class="panel" v-if="scenes.length">
@@ -405,7 +409,7 @@ const App = {
         <div class="panel">
           <h2><span class="step">6</span> 校验我的 YAML</h2>
           <p class="muted" style="font-size:12px">粘贴作者编辑后的 YAML,运行四层校验。该接口不存储传入内容。</p>
-          <textarea class="mono" rows="8" v-model="yamlInput" placeholder="metadata:&#10;  ..."></textarea>
+          <textarea class="mono" rows="8" v-model="yamlInput" placeholder="metadata: ..."></textarea>
           <div class="spacer"></div>
           <button :disabled="busy.validate" @click="validateYaml">校验</button>
           <div v-if="yamlReport" class="spacer"></div>

@@ -13,6 +13,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .prompts import (
+    SOURCE_TEXT_BEGIN,
+    SOURCE_TEXT_END,
     STAGE_REPAIR,
     STAGE_SCENE_CONTENT,
     STAGE_SCENE_PLANNING,
@@ -165,6 +167,25 @@ def _default_chapter_summary(user: str) -> str:
     payload = _extract_payload(user)
     chapter_id = str(payload.get("chapter_id", "ch-1"))
     title = str(payload.get("title", "Chapter"))
+    source_text = _extract_source_text(user)
+    if _contains_cjk(title) or _contains_cjk(source_text):
+        snippet = _snippet(source_text, fallback=title)
+        return _json(
+            {
+                "chapter_id": chapter_id,
+                "title": title,
+                "summary": f"{title}\uff1a{snippet}",
+                "key_events": [
+                    {
+                        "text": f"{title}\u7684\u6838\u5fc3\u4e8b\u4ef6\u63a8\u52a8\u6539\u7f16\u8fdb\u5165\u4e0b\u4e00\u4e2a\u620f\u5267\u8282\u70b9\u3002",
+                        "importance": "high",
+                    }
+                ],
+                "characters_mentioned": ["\u4e3b\u89d2"],
+                "locations_mentioned": ["\u4e3b\u8981\u5730\u70b9"],
+                "open_questions": [],
+            }
+        )
     return _json(
         {
             "chapter_id": chapter_id,
@@ -186,6 +207,27 @@ def _default_chapter_summary(user: str) -> str:
 def _default_scene_plan(user: str) -> str:
     payload = _extract_payload(user)
     summaries = _as_dict_list(payload.get("chapter_summaries", []))
+    if _summaries_contain_cjk(summaries):
+        scenes = []
+        for index, summary in enumerate(summaries, start=1):
+            chapter_id = str(summary.get("chapter_id", f"ch-{index}"))
+            title = str(summary.get("title", f"\u7b2c{index}\u7ae0"))
+            summary_text = str(summary.get("summary", "")).strip()
+            characters = _as_str_list(summary.get("characters_mentioned", [])) or ["\u4e3b\u89d2"]
+            locations = _as_str_list(summary.get("locations_mentioned", []))
+            scenes.append(
+                {
+                    "title": f"{title}\u6539\u7f16\u573a",
+                    "source_chapters": [chapter_id],
+                    "location_name": locations[0] if locations else "\u4e3b\u8981\u5730\u70b9",
+                    "time": "\u672a\u6307\u5b9a",
+                    "characters": characters,
+                    "dramatic_goal": f"\u628a{title}\u7684\u5173\u952e\u60c5\u8282\u8f6c\u5316\u4e3a\u53ef\u8868\u6f14\u7684\u620f\u5267\u884c\u52a8\u3002",
+                    "conflict": "\u4e3b\u89d2\u5728\u7ebf\u7d22\u3001\u538b\u529b\u4e0e\u9009\u62e9\u4e4b\u95f4\u88ab\u63a8\u5411\u4e0b\u4e00\u6b65\u3002",
+                    "summary": summary_text or f"{title}\u7684\u6838\u5fc3\u60c5\u8282\u88ab\u89c4\u5212\u4e3a\u4e00\u573a\u620f\u3002",
+                }
+            )
+        return _json({"scenes": scenes})
     chapter_ids = [
         str(summary.get("chapter_id", f"ch-{index}"))
         for index, summary in enumerate(summaries, start=1)
@@ -216,6 +258,34 @@ def _default_scene_content(user: str) -> str:
     if not isinstance(plan_item, dict):
         plan_item = {}
     title = str(plan_item.get("title", "the scene"))
+    if _contains_cjk(json.dumps(plan_item, ensure_ascii=False)):
+        location = str(plan_item.get("location_name") or "\u4e3b\u8981\u5730\u70b9")
+        characters = _as_str_list(plan_item.get("characters", []))
+        speaker_name = characters[0] if characters else "\u4e3b\u89d2"
+        return _json(
+            {
+                "scene_id": scene_id,
+                "content_blocks": [
+                    {
+                        "type": "action",
+                        "text": f"\u3010{title}\u3011\u5f00\u573a\uff1a{location}\u7684\u6c14\u6c1b\u88ab\u538b\u4f4e\uff0c\u89d2\u8272\u5e26\u7740\u5173\u952e\u7ebf\u7d22\u8d70\u5165\u573a\u666f\u3002",
+                    },
+                    {
+                        "type": "action",
+                        "text": "\u73af\u5883\u7ec6\u8282\u88ab\u653e\u5927\uff0c\u6bcf\u4e00\u4e2a\u52a8\u4f5c\u90fd\u5728\u628a\u51b2\u7a81\u63a8\u5411\u660e\u9762\u3002",
+                    },
+                    {
+                        "type": "dialogue",
+                        "speaker_name": speaker_name,
+                        "line": "\u6211\u4eec\u4e0d\u80fd\u518d\u56de\u907f\u8fd9\u4e2a\u9009\u62e9\u4e86\u3002",
+                        "emotion": "\u514b\u5236",
+                        "action_hint": "\u770b\u5411\u5173\u952e\u7ebf\u7d22",
+                    },
+                ],
+                "adaptation_notes": ["\u4fdd\u7559\u7ae0\u8282\u6838\u5fc3\u4e8b\u4ef6\uff0c\u6539\u5199\u4e3a\u53ef\u8868\u6f14\u7684\u573a\u9762\u52a8\u4f5c\u3002"],
+                "quality_flags": [],
+            }
+        )
     return _json(
         {
             "scene_id": scene_id,
@@ -248,6 +318,10 @@ def _extract_payload(user: str) -> dict[str, Any]:
     return cast(dict[str, Any], loaded)
 
 
+def _extract_source_text(user: str) -> str:
+    return _between(user, SOURCE_TEXT_BEGIN, SOURCE_TEXT_END) or ""
+
+
 def _between(text: str, begin: str, end: str) -> str | None:
     start = text.find(begin)
     if start == -1:
@@ -263,6 +337,33 @@ def _as_dict_list(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
     return [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]
+
+
+def _as_str_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
+
+
+def _contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= character <= "\u9fff" for character in text)
+
+
+def _summaries_contain_cjk(summaries: list[dict[str, Any]]) -> bool:
+    return any(_contains_cjk(json.dumps(summary, ensure_ascii=False)) for summary in summaries)
+
+
+def _snippet(text: str, *, fallback: str, max_chars: int = 64) -> str:
+    compact = " ".join(text.split())
+    if not compact:
+        return fallback
+    for stop in ("\u3002", "\uff01", "\uff1f", ".", "!", "?"):
+        index = compact.find(stop)
+        if 0 <= index < max_chars:
+            return compact[: index + 1]
+    if len(compact) <= max_chars:
+        return compact
+    return f"{compact[: max_chars - 3]}..."
 
 
 def _json(payload: dict[str, Any]) -> str:

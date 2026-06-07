@@ -8,6 +8,8 @@ This repository is a Python monorepo (managed with uv workspaces) for the AI-ass
 
 P0a-lite-1 backend layers are implemented: `shared_types`, `screenplay_schema`, `validators`, `exporters`, `generation`, and `apps/api`. The API is a local FastAPI MVP with in-memory storage, upload rights confirmation, chapter confirmation, synchronous generation, job lookup, and artifact retrieval. `screenplay_schema` provides both generated JSON Schema and static schema documentation.
 
+`apps/api` also ships an embedded local "author workbench" single-page UI (no-build Vue 3 + native fetch, styled with vendored Pico.css), served same-origin by FastAPI `StaticFiles` at `/app`. It only calls the existing endpoints and is intentionally local/demo-oriented (no auth, no persistence). See `docs/API.md` for the full description.
+
 ## Common commands
 
 ```bash
@@ -165,7 +167,7 @@ The current implementation uses this broad structure:
 
 ```text
 apps/
-  api/                 # FastAPI local MVP API
+  api/                 # FastAPI local MVP API + embedded /app workbench (src/api/static)
 packages/
   screenplay_schema/   # JSON Schema and static schema docs
   validators/          # deterministic validation layers
@@ -176,4 +178,4 @@ docs/                  # API, MVP, security, and test documentation
 tests/                 # root smoke tests
 ```
 
-All P0a-lite-1 backend packages are implemented. `apps/api` is intentionally local/demo-oriented: in-memory storage, synchronous generation, no authentication, and no production persistence.
+All P0a-lite-1 backend packages are implemented. `apps/api` is intentionally local/demo-oriented: in-memory storage, synchronous generation, no authentication, and no production persistence. It also serves an embedded author workbench at `/app` (no-build Vue 3 + native fetch + vendored Pico.css under `src/api/static`) that drives the full loop against the same-origin endpoints.

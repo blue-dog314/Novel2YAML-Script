@@ -96,6 +96,16 @@ def build_scene_plan_prompt(
                 "Create one ScenePlanOutput JSON object from these summaries.",
                 "Every chapter_id must appear in at least one planned scene.",
                 (
+                    "Scale the number of scenes to each chapter's information "
+                    "density: split an information-rich chapter into multiple "
+                    "scenes based on its key_events count, location or time "
+                    "changes, and dramatic conflict turning points."
+                ),
+                (
+                    "One chapter may map to several scenes; keep a low-content "
+                    "chapter as a single scene."
+                ),
+                (
                     "Each scene's location_name must be a single location only "
                     "(one primary location per scene); never join multiple places "
                     "with '、', ',', or '/'."

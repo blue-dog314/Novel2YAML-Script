@@ -407,6 +407,32 @@ def test_shared_types_still_rejects_invalid_metadata() -> None:
         _metadata(source_chapter_count=2)
 
 
+def test_duplicate_character_id_fails_reference_validation() -> None:
+    report = validate_document(
+        _draft(
+            characters=[
+                Character(character_id="char-a-b", name="A B"),
+                Character(character_id="char-a-b", name="A-B"),
+            ]
+        )
+    )
+    assert report.reference_validation_passed is False
+    assert any(error.code == "DUPLICATE_CHARACTER_ID" for error in report.errors)
+
+
+def test_duplicate_location_id_fails_reference_validation() -> None:
+    report = validate_document(
+        _draft(
+            locations=[
+                Location(location_id="loc-hall", name="Hall"),
+                Location(location_id="loc-hall", name="The Hall"),
+            ]
+        )
+    )
+    assert report.reference_validation_passed is False
+    assert any(error.code == "DUPLICATE_LOCATION_ID" for error in report.errors)
+
+
 def test_valid_timeline_passes_reference_validation() -> None:
     timeline = [
         TimelineEntry(

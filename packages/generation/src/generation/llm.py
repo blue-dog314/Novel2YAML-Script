@@ -319,7 +319,18 @@ def _extract_payload(user: str) -> dict[str, Any]:
 
 
 def _extract_source_text(user: str) -> str:
-    return _between(user, SOURCE_TEXT_BEGIN, SOURCE_TEXT_END) or ""
+    # Source-text markers carry a per-request nonce suffix (SOURCE_TEXT_BEGIN:<nonce>),
+    # so match on the stable prefix and recover the exact begin/end markers.
+    start = user.find(SOURCE_TEXT_BEGIN)
+    if start == -1:
+        return ""
+    line_end = user.find("\n", start)
+    if line_end == -1:
+        return ""
+    begin_marker = user[start:line_end]
+    nonce_suffix = begin_marker[len(SOURCE_TEXT_BEGIN) :]
+    end_marker = f"{SOURCE_TEXT_END}{nonce_suffix}"
+    return _between(user, begin_marker, end_marker) or ""
 
 
 def _between(text: str, begin: str, end: str) -> str | None:

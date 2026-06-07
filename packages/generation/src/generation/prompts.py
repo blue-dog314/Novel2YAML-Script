@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 from typing import Any
 
 from pydantic import BaseModel
@@ -38,15 +39,19 @@ def build_chapter_summary_prompt(chapter: ChapterInput) -> tuple[str, str]:
         "chapter_id": chapter.chapter_id,
         "title": chapter.title,
     }
+    source_begin, source_end = _source_text_delimiters()
     return (
         _system_prompt(STAGE_SUMMARIZING, ChapterSummaryOutput),
         "\n".join(
             [
                 "Create one ChapterSummaryOutput JSON object for this chapter.",
                 _json_block(payload),
-                SOURCE_TEXT_BEGIN,
-                chapter.text,
-                SOURCE_TEXT_END,
+                "The untrusted source text is delimited by these unique markers:",
+                f"begin marker: {source_begin}",
+                f"end marker: {source_end}",
+                source_begin,
+                _neutralize_source_text(chapter.text),
+                source_end,
                 "Return only the JSON object.",
             ]
         ),
@@ -161,6 +166,39 @@ def _json_block(payload: dict[str, Any]) -> str:
             STRUCTURED_INPUT_END,
         ]
     )
+
+
+def _source_text_delimiters() -> tuple[str, str]:
+    """Return per-request source-text markers carrying a random nonce.
+
+    The novel text is untrusted and may contain the literal sentinel constants
+    in an attempt to close the untrusted region early and inject instructions.
+    Appending an unpredictable nonce to each marker makes the closing marker
+    impossible to forge from the source text alone, while keeping the stable
+    prefix so deterministic consumers can still locate the region.
+    """
+    nonce = secrets.token_hex(16)
+    return f"{SOURCE_TEXT_BEGIN}:{nonce}", f"{SOURCE_TEXT_END}:{nonce}"
+
+
+def _neutralize_source_text(text: str) -> str:
+    """Strip literal sentinel constants from untrusted source text.
+
+    Defense in depth alongside the nonce: even the bare constant markers are
+    removed so the source text cannot reproduce any delimiter line verbatim.
+    """
+    for marker in (
+        SOURCE_TEXT_BEGIN,
+        SOURCE_TEXT_END,
+        STRUCTURED_INPUT_BEGIN,
+        STRUCTURED_INPUT_END,
+        RAW_OUTPUT_BEGIN,
+        RAW_OUTPUT_END,
+        JSON_SCHEMA_BEGIN,
+        JSON_SCHEMA_END,
+    ):
+        text = text.replace(marker, "")
+    return text
 
 
 __all__ = [

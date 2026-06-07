@@ -5,7 +5,7 @@ from __future__ import annotations
 from .artifacts import GenerationArtifacts
 from .assembly import assemble_screenplay
 from .inputs import ChapterInput
-from .llm import FakeLLMClient, LLMClient, OpenAICompatibleLLMClient
+from .llm import FakeLLMClient, LLMClient, OpenAICompatibleLLMClient, resolve_actual_model
 from .orchestrator import (
     PipelineFailure,
     generate_screenplay,
@@ -27,4 +27,5 @@ __all__ = [
     "generate_screenplay",
     "generate_screenplay_with_artifacts",
     "regenerate_scene",
+    "resolve_actual_model",
 ]

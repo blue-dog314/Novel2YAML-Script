@@ -31,6 +31,21 @@ class LLMClient(Protocol):
         """Return a raw JSON string for the given system and user prompts."""
 
 
+def resolve_actual_model(llm: LLMClient, requested_model: str) -> str:
+    """Return the model the client will actually call, not the requested name.
+
+    Real providers send their own configured model (``OPENAI_MODEL`` for the
+    OpenAI-compatible client), so recording the caller-supplied ``request.model``
+    in metadata would be misleading. When the client exposes a non-empty ``model``
+    attribute, that authoritative value wins; otherwise the requested name (used
+    by the deterministic fake) is kept.
+    """
+    actual = getattr(llm, "model", None)
+    if isinstance(actual, str) and actual.strip():
+        return actual
+    return requested_model
+
+
 @dataclass(frozen=True)
 class FakeLLMCall:
     """A recorded fake-client call."""

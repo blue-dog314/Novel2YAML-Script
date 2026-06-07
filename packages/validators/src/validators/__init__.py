@@ -105,14 +105,18 @@ def _validate_references(document: ScreenplayDraftDocument) -> list[ValidationEr
     scene_ids = [scene.scene_id for scene in document.screenplay.scenes]
     scene_orders = [scene.order for scene in document.screenplay.scenes]
     change_ids = [change.change_id for change in document.adaptation_changes]
-    character_ids = {character.character_id for character in document.characters}
-    location_ids = {location.location_id for location in document.locations}
+    character_id_list = [character.character_id for character in document.characters]
+    location_id_list = [location.location_id for location in document.locations]
+    character_ids = set(character_id_list)
+    location_ids = set(location_id_list)
 
     errors.extend(_duplicate_issues(chapter_ids, "DUPLICATE_CHAPTER_ID", "chapters"))
     errors.extend(_duplicate_issues(chapter_orders, "DUPLICATE_CHAPTER_ORDER", "chapters.order"))
     errors.extend(_duplicate_issues(scene_ids, "DUPLICATE_SCENE_ID", "screenplay.scenes"))
     errors.extend(_duplicate_issues(scene_orders, "DUPLICATE_SCENE_ORDER", "screenplay.scenes.order"))
     errors.extend(_duplicate_issues(change_ids, "DUPLICATE_ADAPTATION_CHANGE_ID", "adaptation_changes"))
+    errors.extend(_duplicate_issues(character_id_list, "DUPLICATE_CHARACTER_ID", "characters"))
+    errors.extend(_duplicate_issues(location_id_list, "DUPLICATE_LOCATION_ID", "locations"))
 
     for chapter_index, chapter in enumerate(document.chapters):
         event_ids = [event.event_id for event in chapter.key_events]
@@ -134,6 +138,10 @@ def _validate_references(document: ScreenplayDraftDocument) -> list[ValidationEr
         )
 
     valid_chapter_ids = set(chapter_ids)
+    event_ids_by_chapter = {
+        chapter.chapter_id: {event.event_id for event in chapter.key_events}
+        for chapter in document.chapters
+    }
     for scene_index, scene in enumerate(document.screenplay.scenes):
         scene_path = f"screenplay.scenes[{scene_index}]"
         if not scene.source_chapters:
@@ -195,6 +203,40 @@ def _validate_references(document: ScreenplayDraftDocument) -> list[ValidationEr
                     f"{scene_path}.location_id",
                 )
             )
+
+        scene_block_ids = {block.block_id for block in scene.content_blocks}
+        valid_scene_event_ids = {
+            event_id
+            for source_chapter in scene.source_chapters
+            for event_id in event_ids_by_chapter.get(source_chapter, set())
+        }
+        for coverage_index, coverage in enumerate(scene.key_event_coverage):
+            coverage_path = f"{scene_path}.key_event_coverage[{coverage_index}]"
+            if coverage.key_event_id not in valid_scene_event_ids:
+                errors.append(
+                    _issue(
+                        "UNKNOWN_COVERED_KEY_EVENT",
+                        (
+                            f"scene coverage references key event "
+                            f"{coverage.key_event_id!r} not owned by its source chapters"
+                        ),
+                        f"{coverage_path}.key_event_id",
+                    )
+                )
+            if (
+                coverage.covered_by_block_id is not None
+                and coverage.covered_by_block_id not in scene_block_ids
+            ):
+                errors.append(
+                    _issue(
+                        "UNKNOWN_COVERAGE_BLOCK",
+                        (
+                            f"scene coverage references unknown block "
+                            f"{coverage.covered_by_block_id!r}"
+                        ),
+                        f"{coverage_path}.covered_by_block_id",
+                    )
+                )
 
     valid_scene_ids = set(scene_ids)
     for change_index, change in enumerate(document.adaptation_changes):
@@ -345,6 +387,11 @@ def _validate_coverage(document: ScreenplayDraftDocument) -> list[ValidationErro
         for scene in document.screenplay.scenes
         for source_chapter in scene.source_chapters
     }
+    covered_event_ids = {
+        coverage.key_event_id
+        for scene in document.screenplay.scenes
+        for coverage in scene.key_event_coverage
+    }
     omitted_chapters = {
         source_chapter
         for change in document.adaptation_changes
@@ -381,6 +428,21 @@ def _validate_coverage(document: ScreenplayDraftDocument) -> list[ValidationErro
                         (
                             f"omitted chapter {chapter.chapter_id!r} has key events "
                             f"not marked omitted or merged: {active_events[0]!r}"
+                        ),
+                        "chapters",
+                    )
+                )
+            continue
+        for event in chapter.key_events:
+            if event.status in {"omitted", "merged"}:
+                continue
+            if event.event_id not in covered_event_ids:
+                errors.append(
+                    _issue(
+                        "KEY_EVENT_NOT_COVERED",
+                        (
+                            f"chapter {chapter.chapter_id!r} key event "
+                            f"{event.event_id!r} not covered by any scene"
                         ),
                         "chapters",
                     )

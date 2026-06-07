@@ -20,6 +20,7 @@ from shared_types import (
     Metadata,
     NoteBlock,
     Scene,
+    SceneKeyEventCoverage,
     Screenplay,
     ScreenplayDraftDocument,
     StoryBible,
@@ -81,6 +82,10 @@ def _draft(**overrides: Any) -> ScreenplayDraftDocument:
         source_chapters=["ch-1", "ch-2", "ch-3"],
         summary="Alice greets.",
         content_blocks=[_block()],
+        key_event_coverage=[
+            SceneKeyEventCoverage(key_event_id=f"ev-{order}", fidelity_status="faithful")
+            for order in (1, 2, 3)
+        ],
     )
     data: dict[str, Any] = {
         "metadata": _metadata(),
@@ -361,6 +366,10 @@ def test_omitted_chapter_with_omitted_key_events_passes_coverage() -> None:
         source_chapters=["ch-1", "ch-2"],
         summary="Alice greets.",
         content_blocks=[_block()],
+        key_event_coverage=[
+            SceneKeyEventCoverage(key_event_id="ev-1", fidelity_status="faithful"),
+            SceneKeyEventCoverage(key_event_id="ev-2", fidelity_status="faithful"),
+        ],
     )
 
     report = validate_document(
@@ -560,3 +569,155 @@ def test_duplicate_story_bible_location_fails_reference_validation() -> None:
     )
     assert report.reference_validation_passed is False
     assert any(error.code == "DUPLICATE_STORY_BIBLE_LOCATION" for error in report.errors)
+
+
+def test_uncovered_key_event_fails_coverage_validation() -> None:
+    chapters = [_chapter(1), _chapter(2), _chapter(3)]
+    chapters[2] = Chapter(
+        chapter_id="ch-3",
+        order=3,
+        title="Chapter 3",
+        summary="The story continues.",
+        key_events=[
+            KeyEvent(event_id="ev-3", text="First event.", status="adapted"),
+            KeyEvent(event_id="ev-3b", text="Missing event.", status="adapted"),
+        ],
+    )
+    scene = Scene(
+        scene_id="sc-1",
+        order=1,
+        title="Opening Scene",
+        source_chapters=["ch-1", "ch-2", "ch-3"],
+        summary="Alice greets.",
+        content_blocks=[_block()],
+        key_event_coverage=[
+            SceneKeyEventCoverage(key_event_id="ev-1", fidelity_status="faithful"),
+            SceneKeyEventCoverage(key_event_id="ev-2", fidelity_status="faithful"),
+            SceneKeyEventCoverage(key_event_id="ev-3", fidelity_status="faithful"),
+        ],
+    )
+    report = validate_document(
+        _draft(chapters=chapters, screenplay=Screenplay(scenes=[scene]))
+    )
+    assert report.coverage_validation_passed is False
+    assert any(error.code == "KEY_EVENT_NOT_COVERED" for error in report.errors)
+    assert any("ev-3b" in error.message for error in report.errors)
+
+
+def test_merged_key_event_is_exempt_from_coverage() -> None:
+    chapters = [_chapter(1), _chapter(2), _chapter(3)]
+    chapters[2] = Chapter(
+        chapter_id="ch-3",
+        order=3,
+        title="Chapter 3",
+        summary="The story continues.",
+        key_events=[
+            KeyEvent(event_id="ev-3", text="Covered event.", status="adapted"),
+            KeyEvent(event_id="ev-3b", text="Merged elsewhere.", status="merged"),
+        ],
+    )
+    scene = Scene(
+        scene_id="sc-1",
+        order=1,
+        title="Opening Scene",
+        source_chapters=["ch-1", "ch-2", "ch-3"],
+        summary="Alice greets.",
+        content_blocks=[_block()],
+        key_event_coverage=[
+            SceneKeyEventCoverage(key_event_id="ev-1", fidelity_status="faithful"),
+            SceneKeyEventCoverage(key_event_id="ev-2", fidelity_status="faithful"),
+            SceneKeyEventCoverage(key_event_id="ev-3", fidelity_status="faithful"),
+        ],
+    )
+    report = validate_document(
+        _draft(chapters=chapters, screenplay=Screenplay(scenes=[scene]))
+    )
+    assert report.coverage_validation_passed is True
+    assert report.errors == []
+
+
+def test_duplicate_character_id_fails_reference_validation() -> None:
+    report = validate_document(
+        _draft(
+            characters=[
+                Character(character_id="char-1", name="Alice"),
+                Character(character_id="char-1", name="Alicia"),
+            ],
+        )
+    )
+    assert report.reference_validation_passed is False
+    assert any(error.code == "DUPLICATE_CHARACTER_ID" for error in report.errors)
+
+
+def test_duplicate_location_id_fails_reference_validation() -> None:
+    report = validate_document(
+        _draft(
+            locations=[
+                Location(location_id="loc-1", name="Courtyard"),
+                Location(location_id="loc-1", name="Garden"),
+            ],
+        )
+    )
+    assert report.reference_validation_passed is False
+    assert any(error.code == "DUPLICATE_LOCATION_ID" for error in report.errors)
+
+
+def test_coverage_referencing_foreign_chapter_event_fails_reference_validation() -> None:
+    # sc-1 sources ch-1/ch-2/ch-3, but cites ch-3's event id via a scene that
+    # only sources ch-1 -> the event is not owned by the scene's source chapters.
+    scene = Scene(
+        scene_id="sc-1",
+        order=1,
+        title="Opening Scene",
+        source_chapters=["ch-1"],
+        summary="Alice greets.",
+        content_blocks=[_block()],
+        key_event_coverage=[
+            SceneKeyEventCoverage(key_event_id="ev-1", fidelity_status="faithful"),
+            SceneKeyEventCoverage(key_event_id="ev-2", fidelity_status="faithful"),
+        ],
+    )
+    chapters = [_chapter(1), _chapter(2), _chapter(3)]
+    report = validate_document(
+        _draft(
+            chapters=chapters,
+            screenplay=Screenplay(scenes=[scene]),
+            adaptation_changes=[
+                AdaptationChange(
+                    change_id="chg-1",
+                    type="omitted",
+                    source_chapters=["ch-2", "ch-3"],
+                    affected_scenes=[],
+                    description="Chapters 2 and 3 omitted.",
+                    reason="Scope control.",
+                )
+            ],
+        )
+    )
+    assert report.reference_validation_passed is False
+    assert any(error.code == "UNKNOWN_COVERED_KEY_EVENT" for error in report.errors)
+    assert any("ev-2" in error.message for error in report.errors)
+
+
+def test_coverage_referencing_unknown_block_fails_reference_validation() -> None:
+    scene = Scene(
+        scene_id="sc-1",
+        order=1,
+        title="Opening Scene",
+        source_chapters=["ch-1", "ch-2", "ch-3"],
+        summary="Alice greets.",
+        content_blocks=[_block(block_id="b-1")],
+        key_event_coverage=[
+            SceneKeyEventCoverage(
+                key_event_id="ev-1",
+                fidelity_status="faithful",
+                covered_by_block_id="b-missing",
+            ),
+            SceneKeyEventCoverage(key_event_id="ev-2", fidelity_status="faithful"),
+            SceneKeyEventCoverage(key_event_id="ev-3", fidelity_status="faithful"),
+        ],
+    )
+    report = validate_document(_draft(screenplay=Screenplay(scenes=[scene])))
+    assert report.reference_validation_passed is False
+    assert any(error.code == "UNKNOWN_COVERAGE_BLOCK" for error in report.errors)
+    assert any("b-missing" in error.message for error in report.errors)

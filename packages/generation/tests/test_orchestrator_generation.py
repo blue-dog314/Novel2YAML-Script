@@ -206,18 +206,74 @@ def test_pipeline_failure_preserves_completed_artifacts() -> None:
     assert error.retryable is True
 
 
-def test_validation_failure_uses_coverage_error_contract() -> None:
-    empty_scene_content = json.dumps(
+def test_empty_key_events_get_fallback_for_coverage() -> None:
+    summaries = [
+        json.dumps(
+            {
+                "chapter_id": f"ch-{index}",
+                "title": f"Chapter {index}",
+                "summary": f"Summary {index}.",
+                "key_events": [],
+                "characters_mentioned": [],
+                "locations_mentioned": [],
+                "open_questions": [],
+            },
+            sort_keys=True,
+        )
+        for index in range(1, 4)
+    ]
+    llm = FakeLLMClient(responses={"summarizing": summaries})
+
+    document = _generate(llm)
+
+    assert [chapter.key_events[0].text for chapter in document.chapters] == [
+        "Summary 1.",
+        "Summary 2.",
+        "Summary 3.",
+    ]
+    assert validate_document(document).errors == []
+
+
+def test_scene_content_without_action_or_dialogue_gets_fallback_action() -> None:
+    note_only_scene_content = json.dumps(
         {
             "scene_id": "sc-001",
-            "content_blocks": [],
+            "content_blocks": [{"type": "note", "text": "Production note only."}],
             "adaptation_notes": [],
             "quality_flags": [],
+            "covered_key_events": [
+                {
+                    "key_event_id": f"ch-{order}-ev-001",
+                    "fidelity_status": "faithful",
+                    "covered_by_block_index": 1,
+                }
+                for order in (1, 2, 3)
+            ],
         },
         sort_keys=True,
     )
     llm = FakeLLMClient(
-        responses={"scene_content_generation": [empty_scene_content]}
+        responses={"scene_content_generation": [note_only_scene_content]}
+    )
+
+    document = _generate(llm)
+
+    scene = document.screenplay.scenes[0]
+    assert scene.content_blocks[0].type == "action"
+    assert scene.content_blocks[1].type == "note"
+    assert "added_fallback_action_for_validation" in scene.quality_flags
+    assert validate_document(document).errors == []
+
+
+def test_validation_failure_uses_coverage_error_contract() -> None:
+    empty_scene_plan = json.dumps(
+        {
+            "scenes": [],
+        },
+        sort_keys=True,
+    )
+    llm = FakeLLMClient(
+        responses={"scene_planning": [empty_scene_plan]}
     )
 
     with pytest.raises(PipelineFailure) as exc_info:
@@ -232,7 +288,7 @@ def test_validation_failure_uses_coverage_error_contract() -> None:
         "scene_contents",
         "screenplay_draft",
     ]
-    assert "SCENE_CONTENT_BLOCKS_EMPTY" in error.error_message
+    assert "SCREENPLAY_EMPTY" in error.error_message
 
 
 def test_chapter_summary_prompt_marks_source_as_untrusted() -> None:

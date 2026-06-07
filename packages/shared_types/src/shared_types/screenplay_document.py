@@ -25,6 +25,11 @@ KeyEventStatus = Literal[
     "pending_review",
 ]
 
+# How faithfully a scene covers a source key event. Defined independently from
+# the identical Literal in ``model_output`` so the two contract layers stay
+# decoupled (the document layer must not import the model layer).
+KeyEventFidelityStatus = Literal["faithful", "adapted", "partial", "omitted"]
+
 AdaptationChangeType = Literal[
     "merged",
     "omitted",
@@ -142,6 +147,23 @@ class Location(BaseModel):
 # --- screenplay ------------------------------------------------------------
 
 
+class SceneKeyEventCoverage(BaseModel):
+    """A backend-owned record that a scene covers a source key event.
+
+    Assembled from the model's ``CoveredKeyEvent`` claims after the backend
+    verifies that ``key_event_id`` is a real event of one of the scene's source
+    chapters and (when given) resolves the model's block index to a real
+    ``block_id``. Unverifiable claims are dropped during assembly.
+    """
+
+    model_config = FORBID_EXTRA_CONFIG
+
+    key_event_id: str
+    fidelity_status: KeyEventFidelityStatus
+    covered_by_block_id: str | None = None
+    notes: str | None = None
+
+
 class Scene(BaseModel):
     """A single scene with ordered content blocks."""
 
@@ -153,6 +175,7 @@ class Scene(BaseModel):
     source_chapters: list[str] = []
     summary: str
     content_blocks: list[ContentBlock] = []
+    key_event_coverage: list[SceneKeyEventCoverage] = []
     location_id: str | None = None
     location_name: str | None = None
     time: str | None = None

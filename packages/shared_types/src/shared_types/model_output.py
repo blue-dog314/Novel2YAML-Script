@@ -28,6 +28,11 @@ KeyEventImportance = Literal["high", "medium", "low"]
 # Block ``type`` is shared between the model layer and the document layer.
 ContentBlockType = Literal["action", "dialogue", "voice_over", "note"]
 
+# How faithfully a scene covers a source key event. Defined here for the model
+# layer; the document layer defines an identical Literal independently so the
+# two contract layers stay decoupled.
+KeyEventFidelityStatus = Literal["faithful", "adapted", "partial", "omitted"]
+
 
 class KeyEventOutput(BaseModel):
     """A single key event as produced by chapter-summary generation."""
@@ -132,6 +137,24 @@ ModelContentBlock = Annotated[
 ]
 
 
+class CoveredKeyEvent(BaseModel):
+    """A model-reported claim that a scene covers a source key event.
+
+    The model references the backend-computed ``key_event_id`` (it never mints
+    ids) and points at the block that covers the event by 1-based
+    ``covered_by_block_index`` into ``content_blocks`` -- the model layer has no
+    ``block_id`` (the backend assigns those during assembly). The backend treats
+    these claims as untrusted and re-verifies every reference before keeping it.
+    """
+
+    model_config = FORBID_EXTRA_CONFIG
+
+    key_event_id: str
+    fidelity_status: KeyEventFidelityStatus
+    covered_by_block_index: int | None = None
+    notes: str | None = None
+
+
 class SceneContentOutput(BaseModel):
     """Structured output for the scene-content generation stage."""
 
@@ -139,6 +162,7 @@ class SceneContentOutput(BaseModel):
 
     scene_id: str
     content_blocks: list[ModelContentBlock]
+    covered_key_events: list[CoveredKeyEvent] = []
     adaptation_notes: list[str] = []
     quality_flags: list[str] = []
 

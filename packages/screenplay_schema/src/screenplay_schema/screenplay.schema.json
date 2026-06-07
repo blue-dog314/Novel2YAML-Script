@@ -628,6 +628,14 @@
           "title": "Content Blocks",
           "type": "array"
         },
+        "key_event_coverage": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SceneKeyEventCoverage"
+          },
+          "title": "Key Event Coverage",
+          "type": "array"
+        },
         "location_id": {
           "anyOf": [
             {
@@ -744,6 +752,56 @@
         "summary"
       ],
       "title": "Scene",
+      "type": "object"
+    },
+    "SceneKeyEventCoverage": {
+      "additionalProperties": false,
+      "description": "A backend-owned record that a scene covers a source key event.\n\nAssembled from the model's ``CoveredKeyEvent`` claims after the backend\nverifies that ``key_event_id`` is a real event of one of the scene's source\nchapters and (when given) resolves the model's block index to a real\n``block_id``. Unverifiable claims are dropped during assembly.",
+      "properties": {
+        "key_event_id": {
+          "title": "Key Event Id",
+          "type": "string"
+        },
+        "fidelity_status": {
+          "enum": [
+            "faithful",
+            "adapted",
+            "partial",
+            "omitted"
+          ],
+          "title": "Fidelity Status",
+          "type": "string"
+        },
+        "covered_by_block_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Covered By Block Id"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "key_event_id",
+        "fidelity_status"
+      ],
+      "title": "SceneKeyEventCoverage",
       "type": "object"
     },
     "Screenplay": {

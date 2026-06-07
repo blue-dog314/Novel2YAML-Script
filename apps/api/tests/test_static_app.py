@@ -24,3 +24,13 @@ def test_workbench_vendor_vue_served(client: TestClient) -> None:
     # on the symbol (rather than file size) is what actually distinguishes the
     # two builds.
     assert "compileToFunction" in response.text
+
+
+def test_workbench_vendor_pico_served(client: TestClient) -> None:
+    response = client.get("/app/vendor/pico.min.css")
+
+    assert response.status_code == 200
+    assert "text/css" in response.headers["content-type"]
+    # The workbench layers its own theme on top of Pico; if this vendored file
+    # goes missing the page falls back to unstyled Pico-less markup, so pin it.
+    assert "Pico CSS" in response.text

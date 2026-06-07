@@ -9,6 +9,7 @@ from exporters import export_validated_yaml
 from shared_types import (
     Character,
     ChapterSummaryOutput,
+    CoveredKeyEvent,
     DialogueBlock,
     KeyEventOutput,
     Location,
@@ -58,7 +59,11 @@ def _scene_plan() -> ScenePlanOutput:
     )
 
 
-def _scene_content(scene_id: str, speaker_name: str = "Alice") -> SceneContentOutput:
+def _scene_content(
+    scene_id: str,
+    speaker_name: str = "Alice",
+    covered_event_ids: tuple[str, ...] = (),
+) -> SceneContentOutput:
     return SceneContentOutput(
         scene_id=scene_id,
         content_blocks=[
@@ -72,6 +77,14 @@ def _scene_content(scene_id: str, speaker_name: str = "Alice") -> SceneContentOu
         ],
         adaptation_notes=["保留关键冲突。"],
         quality_flags=["needs_review"],
+        covered_key_events=[
+            CoveredKeyEvent(
+                key_event_id=event_id,
+                fidelity_status="faithful",
+                covered_by_block_index=1,
+            )
+            for event_id in covered_event_ids
+        ],
     )
 
 
@@ -79,7 +92,10 @@ def _kwargs(**overrides: Any) -> dict[str, Any]:
     data: dict[str, Any] = {
         "chapter_summaries": [_chapter_summary(1), _chapter_summary(2), _chapter_summary(3)],
         "scene_plan": _scene_plan(),
-        "scene_contents": [_scene_content("sc-001"), _scene_content("sc-002")],
+        "scene_contents": [
+            _scene_content("sc-001", covered_event_ids=("ch-1-ev-001", "ch-2-ev-001")),
+            _scene_content("sc-002", covered_event_ids=("ch-3-ev-001",)),
+        ],
         "project_id": "proj-1",
         "title": "测试小说",
         "original_author": "作者",
@@ -376,3 +392,54 @@ def test_story_bible_is_deterministic() -> None:
 def test_assembled_story_bible_passes_validators() -> None:
     report = validate_document(assemble_screenplay(**_kwargs()))
     assert report.reference_validation_passed is True
+
+
+def test_key_event_coverage_maps_block_index_to_block_id() -> None:
+    document = assemble_screenplay(**_kwargs())
+    coverage = document.screenplay.scenes[0].key_event_coverage
+    by_event = {item.key_event_id: item for item in coverage}
+    assert set(by_event) == {"ch-1-ev-001", "ch-2-ev-001"}
+    # covered_by_block_index=1 -> first block of sc-001.
+    assert by_event["ch-1-ev-001"].covered_by_block_id == "sc-001-blk-001"
+    assert by_event["ch-1-ev-001"].fidelity_status == "faithful"
+
+
+def test_invalid_key_event_id_is_dropped() -> None:
+    # sc-001 sources ch-1 & ch-2; a claim citing ch-3's event is not valid here.
+    scene_contents = [
+        _scene_content(
+            "sc-001",
+            covered_event_ids=("ch-1-ev-001", "ch-3-ev-001", "ch-2-ev-001"),
+        ),
+        _scene_content("sc-002", covered_event_ids=("ch-3-ev-001",)),
+    ]
+    document = assemble_screenplay(**_kwargs(scene_contents=scene_contents))
+    covered_ids = {
+        item.key_event_id for item in document.screenplay.scenes[0].key_event_coverage
+    }
+    assert covered_ids == {"ch-1-ev-001", "ch-2-ev-001"}
+
+
+def test_out_of_range_block_index_resolves_to_none() -> None:
+    content = SceneContentOutput(
+        scene_id="sc-002",
+        content_blocks=[ModelActionBlock(text="单一动作块。")],
+        adaptation_notes=[],
+        quality_flags=[],
+        covered_key_events=[
+            CoveredKeyEvent(
+                key_event_id="ch-3-ev-001",
+                fidelity_status="adapted",
+                covered_by_block_index=99,
+            )
+        ],
+    )
+    scene_contents = [
+        _scene_content("sc-001", covered_event_ids=("ch-1-ev-001", "ch-2-ev-001")),
+        content,
+    ]
+    document = assemble_screenplay(**_kwargs(scene_contents=scene_contents))
+    coverage = document.screenplay.scenes[1].key_event_coverage
+    assert len(coverage) == 1
+    assert coverage[0].key_event_id == "ch-3-ev-001"
+    assert coverage[0].covered_by_block_id is None

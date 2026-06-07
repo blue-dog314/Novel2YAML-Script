@@ -33,7 +33,7 @@ It also requires `source_chapter_count >= 3`.
 
 ## Screenplay body
 
-`screenplay.scenes` contains ordered scenes. Each scene includes `source_chapters` and ordered `content_blocks`.
+`screenplay.scenes` contains ordered scenes. Each scene includes `source_chapters` and ordered `content_blocks`, plus a backend-verified `key_event_coverage` list recording which chapter key events the scene covers (each entry carries `key_event_id`, `fidelity_status`, an optional `covered_by_block_id`, and `notes`).
 
 Supported content block types:
 
@@ -102,4 +102,4 @@ An `omitted` chapter is valid only when its key events are marked `omitted` or
 
 ## Validation boundary
 
-JSON Schema covers required fields, types, enums, numeric ranges, and unknown-field rejection. Runtime validators remain responsible for reference and coverage checks such as valid `source_chapters`, duplicate orders, empty scenes, timeline references, and chapter coverage.
+JSON Schema covers required fields, types, enums, numeric ranges, and unknown-field rejection. Runtime validators remain responsible for reference and coverage checks such as valid `source_chapters`, duplicate orders, empty scenes, timeline references, unique `characters[].character_id` / `locations[].location_id`, well-formed `key_event_coverage` references (each entry's `key_event_id` must be owned by the scene's source chapters and any `covered_by_block_id` must name a block in the same scene), chapter coverage, and key-event coverage (each scene reports `key_event_coverage[]` and every active chapter key event must be covered by some scene).

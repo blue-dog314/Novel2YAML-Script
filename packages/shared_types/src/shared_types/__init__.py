@@ -15,6 +15,7 @@ from .errors import PipelineError, PipelineErrorType, PipelineStage
 from .model_output import (
     ChapterSummaryOutput,
     ContentBlockType,
+    CoveredKeyEvent,
     KeyEventImportance,
     KeyEventOutput,
     ModelActionBlock,
@@ -39,6 +40,7 @@ from .screenplay_document import (
     DialogueBlock,
     EmbeddedValidation,
     KeyEvent,
+    KeyEventFidelityStatus,
     KeyEventStatus,
     Location,
     LocationProfile,
@@ -46,6 +48,7 @@ from .screenplay_document import (
     NoteBlock,
     RevisionNote,
     Scene,
+    SceneKeyEventCoverage,
     Screenplay,
     ScreenplayDraftDocument,
     StoryBible,
@@ -87,9 +90,11 @@ __all__ = [
     "ModelNoteBlock",
     "ModelContentBlock",
     "SceneContentOutput",
+    "CoveredKeyEvent",
     "RepairOutput",
     # document layer: enums
     "KeyEventStatus",
+    "KeyEventFidelityStatus",
     "AdaptationChangeType",
     # document layer: content blocks
     "ActionBlock",
@@ -103,6 +108,7 @@ __all__ = [
     "Character",
     "Location",
     "Scene",
+    "SceneKeyEventCoverage",
     "Screenplay",
     "TimelineEntry",
     "CharacterProfile",

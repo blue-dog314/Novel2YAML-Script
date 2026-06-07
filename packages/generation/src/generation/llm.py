@@ -266,12 +266,36 @@ def _default_scene_plan(user: str) -> str:
     )
 
 
+def _default_covered_key_events(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Backfill covered_key_events for the fake path.
+
+    Reads the backend-injected ``key_events`` ([{event_id, text}]) and reports
+    each as covered by the first content block. This keeps fake-generated
+    documents passing the key-event coverage validator without minting ids in
+    the model layer (it only echoes the backend-owned event_id).
+    """
+    covered: list[dict[str, Any]] = []
+    for event in _as_dict_list(payload.get("key_events", [])):
+        event_id = event.get("event_id")
+        if not isinstance(event_id, str) or not event_id:
+            continue
+        covered.append(
+            {
+                "key_event_id": event_id,
+                "fidelity_status": "faithful",
+                "covered_by_block_index": 1,
+            }
+        )
+    return covered
+
+
 def _default_scene_content(user: str) -> str:
     payload = _extract_payload(user)
     scene_id = str(payload.get("scene_id", "sc-001"))
     plan_item = payload.get("plan_item", {})
     if not isinstance(plan_item, dict):
         plan_item = {}
+    covered_key_events = _default_covered_key_events(payload)
     title = str(plan_item.get("title", "the scene"))
     if _contains_cjk(json.dumps(plan_item, ensure_ascii=False)):
         location = str(plan_item.get("location_name") or "\u4e3b\u8981\u5730\u70b9")
@@ -299,6 +323,7 @@ def _default_scene_content(user: str) -> str:
                 ],
                 "adaptation_notes": ["\u4fdd\u7559\u7ae0\u8282\u6838\u5fc3\u4e8b\u4ef6\uff0c\u6539\u5199\u4e3a\u53ef\u8868\u6f14\u7684\u573a\u9762\u52a8\u4f5c\u3002"],
                 "quality_flags": [],
+                "covered_key_events": covered_key_events,
             }
         )
     return _json(
@@ -319,6 +344,7 @@ def _default_scene_content(user: str) -> str:
             ],
             "adaptation_notes": ["Condensed chapter-level source material."],
             "quality_flags": [],
+            "covered_key_events": covered_key_events,
         }
     )
 

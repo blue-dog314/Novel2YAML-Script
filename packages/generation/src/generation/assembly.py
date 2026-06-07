@@ -30,6 +30,7 @@ from shared_types import (
     NoteBlock,
     Scene,
     SceneContentOutput,
+    SceneKeyEventCoverage,
     ScenePlanOutput,
     Screenplay,
     ScreenplayDraftDocument,
@@ -144,6 +145,7 @@ def assemble_screenplay(
         content_by_scene_id,
         character_registry,
         location_registry,
+        chapter_summaries,
     )
     timeline = _assemble_timeline(chapter_summaries, scenes)
     characters = character_registry.characters()
@@ -226,10 +228,40 @@ def _slug_core(name: str) -> str:
     return _SLUG_SEPARATOR_RE.sub("-", "".join(parts)).strip("-")
 
 
+def key_event_id(chapter_id: str, index: int) -> str:
+    """Deterministic key-event id. Single source of truth.
+
+    Used both when assembling ``chapter.key_events`` and when building the
+    ``(event_id, text)`` pairs that scene generation references, so the id the
+    model is asked to cite matches the id the validators check.
+    """
+    return f"{chapter_id}-ev-{index:03d}"
+
+
+def build_scene_key_events(
+    chapter_summaries: list[ChapterSummaryOutput],
+    source_chapters: list[str],
+) -> list[tuple[str, str]]:
+    """Return ``(event_id, text)`` pairs for a scene's source chapters.
+
+    Event ids are computed with the same deterministic rule as assembly, so a
+    scene can be asked to cover specific events by stable id.
+    """
+    summaries_by_id = {summary.chapter_id: summary for summary in chapter_summaries}
+    pairs: list[tuple[str, str]] = []
+    for chapter_id in source_chapters:
+        summary = summaries_by_id.get(chapter_id)
+        if summary is None:
+            continue
+        for index, event in enumerate(summary.key_events, start=1):
+            pairs.append((key_event_id(chapter_id, index), event.text))
+    return pairs
+
+
 def _assemble_key_events(chapter: ChapterSummaryOutput) -> list[KeyEvent]:
     return [
         KeyEvent(
-            event_id=f"{chapter.chapter_id}-ev-{index:03d}",
+            event_id=key_event_id(chapter.chapter_id, index),
             text=key_event.text,
             status="pending_review",
         )
@@ -347,12 +379,48 @@ def _assemble_content_block(
     raise TypeError(f"unsupported content block type {type(block).__name__}")
 
 
+def _assemble_key_event_coverage(
+    covered_key_events: list[Any],
+    valid_event_ids: set[str],
+    block_ids: list[str],
+) -> list[SceneKeyEventCoverage]:
+    """Assemble verified key-event coverage records for one scene.
+
+    Model claims are untrusted: a claim is kept only if its ``key_event_id``
+    belongs to one of the scene's source chapters. ``covered_by_block_index`` is
+    1-based into the scene's content blocks; out-of-range indices are dropped to
+    ``None`` rather than rejecting the whole claim. Duplicate event ids collapse
+    to the first kept claim.
+    """
+    coverage: list[SceneKeyEventCoverage] = []
+    seen_event_ids: set[str] = set()
+    for claim in covered_key_events:
+        event_id = claim.key_event_id
+        if event_id not in valid_event_ids or event_id in seen_event_ids:
+            continue
+        seen_event_ids.add(event_id)
+        block_id: str | None = None
+        block_index = claim.covered_by_block_index
+        if block_index is not None and 1 <= block_index <= len(block_ids):
+            block_id = block_ids[block_index - 1]
+        coverage.append(
+            SceneKeyEventCoverage(
+                key_event_id=event_id,
+                fidelity_status=claim.fidelity_status,
+                covered_by_block_id=block_id,
+                notes=claim.notes,
+            )
+        )
+    return coverage
+
+
 def _assemble_scenes(
     scene_plan: ScenePlanOutput,
     scene_ids: list[str],
     content_by_scene_id: dict[str, SceneContentOutput],
     character_registry: _CharacterRegistry,
     location_registry: _LocationRegistry,
+    chapter_summaries: list[ChapterSummaryOutput],
 ) -> list[Scene]:
     scenes: list[Scene] = []
     for index, (scene_id, plan_item) in enumerate(zip(scene_ids, scene_plan.scenes, strict=True), start=1):
@@ -362,6 +430,26 @@ def _assemble_scenes(
             if plan_item.location_name is not None
             else None
         )
+        content_blocks = [
+            _assemble_content_block(
+                scene_id,
+                block_index,
+                block,
+                character_registry,
+            )
+            for block_index, block in enumerate(content.content_blocks, start=1)
+        ]
+        valid_event_ids = {
+            event_id
+            for event_id, _ in build_scene_key_events(
+                chapter_summaries, plan_item.source_chapters
+            )
+        }
+        key_event_coverage = _assemble_key_event_coverage(
+            content.covered_key_events,
+            valid_event_ids,
+            [block.block_id for block in content_blocks],
+        )
         scenes.append(
             Scene(
                 scene_id=scene_id,
@@ -369,15 +457,8 @@ def _assemble_scenes(
                 title=plan_item.title,
                 source_chapters=plan_item.source_chapters,
                 summary=plan_item.summary,
-                content_blocks=[
-                    _assemble_content_block(
-                        scene_id,
-                        block_index,
-                        block,
-                        character_registry,
-                    )
-                    for block_index, block in enumerate(content.content_blocks, start=1)
-                ],
+                content_blocks=content_blocks,
+                key_event_coverage=key_event_coverage,
                 location_id=location_id,
                 location_name=plan_item.location_name,
                 time=plan_item.time,
@@ -421,4 +502,6 @@ def _make_metadata(
 
 __all__ = [
     "assemble_screenplay",
+    "build_scene_key_events",
+    "key_event_id",
 ]

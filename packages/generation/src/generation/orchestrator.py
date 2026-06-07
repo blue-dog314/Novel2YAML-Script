@@ -20,7 +20,7 @@ from shared_types import (
 from validators import validate_document
 
 from .artifacts import GenerationArtifacts
-from .assembly import assemble_screenplay
+from .assembly import assemble_screenplay, build_scene_key_events
 from .chapter_summary import summarize_chapters
 from .inputs import ChapterInput
 from .llm import LLMClient, resolve_actual_model
@@ -134,7 +134,12 @@ def generate_screenplay_with_artifacts(
                 scene_plan=scene_plan,
             )
             try:
-                scene_contents.append(write_scene(_scene_id(index), plan_item, llm))
+                relevant_key_events = build_scene_key_events(
+                    chapter_summaries, plan_item.source_chapters
+                )
+                scene_contents.append(
+                    write_scene(_scene_id(index), plan_item, llm, relevant_key_events)
+                )
             except ModelOutputInvalid as exc:
                 _raise_model_output_failure(exc, partial)
             except Exception as exc:
@@ -209,7 +214,11 @@ def regenerate_scene(
         _raise_unknown_scene_id(scene_id, artifacts)
 
     try:
-        new_content = write_scene(scene_id, scene_plan.scenes[pos], llm)
+        plan_item = scene_plan.scenes[pos]
+        relevant_key_events = build_scene_key_events(
+            artifacts.chapter_summaries or [], plan_item.source_chapters
+        )
+        new_content = write_scene(scene_id, plan_item, llm, relevant_key_events)
     except ModelOutputInvalid as exc:
         _raise_model_output_failure(exc, artifacts)
     except Exception as exc:

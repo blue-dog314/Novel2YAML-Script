@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from shared_types import ChapterSummaryOutput
+from shared_types import ChapterSummaryOutput, KeyEventOutput
 
 from .inputs import ChapterInput
 from .llm import LLMClient
@@ -23,12 +23,26 @@ def _summarize_chapter(
     llm: LLMClient,
 ) -> ChapterSummaryOutput:
     system, user = build_chapter_summary_prompt(chapter)
-    return complete_json_with_repair(
+    summary = complete_json_with_repair(
         model_type=ChapterSummaryOutput,
         llm=llm,
         stage=STAGE_SUMMARIZING,
         system=system,
         user=user,
+    )
+    return _ensure_key_events(summary)
+
+
+def _ensure_key_events(summary: ChapterSummaryOutput) -> ChapterSummaryOutput:
+    if summary.key_events:
+        return summary
+    fallback_text = summary.summary.strip() or f"{summary.title} 的核心事件需要作者复核。"
+    return summary.model_copy(
+        update={
+            "key_events": [
+                KeyEventOutput(text=fallback_text, importance="medium"),
+            ],
+        },
     )
 
 

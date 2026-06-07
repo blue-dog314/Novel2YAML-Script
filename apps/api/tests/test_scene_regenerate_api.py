@@ -45,6 +45,14 @@ def _scene_content(scene_id: str, text: str) -> str:
             "content_blocks": [{"type": "action", "text": text}],
             "adaptation_notes": [],
             "quality_flags": [],
+            "covered_key_events": [
+                {
+                    "key_event_id": f"ch-{order}-ev-001",
+                    "fidelity_status": "faithful",
+                    "covered_by_block_index": 1,
+                }
+                for order in (1, 2, 3)
+            ],
         },
         sort_keys=True,
     )

@@ -15,6 +15,7 @@ from shared_types import (
     KeyEvent,
     Metadata,
     Scene,
+    SceneKeyEventCoverage,
     Screenplay,
     ScreenplayDraftDocument,
 )
@@ -81,6 +82,10 @@ def _draft(*, screenplay: Screenplay | None = None) -> ScreenplayDraftDocument:
                 speaker_name="Alice",
                 line="你好。",
             )
+        ],
+        key_event_coverage=[
+            SceneKeyEventCoverage(key_event_id=f"ev-{order}", fidelity_status="faithful")
+            for order in (1, 2, 3)
         ],
     )
     return ScreenplayDraftDocument(

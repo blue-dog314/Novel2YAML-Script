@@ -721,3 +721,44 @@ def test_coverage_referencing_unknown_block_fails_reference_validation() -> None
     assert report.reference_validation_passed is False
     assert any(error.code == "UNKNOWN_COVERAGE_BLOCK" for error in report.errors)
     assert any("b-missing" in error.message for error in report.errors)
+
+
+def _scene_with_location_name(location_name: str) -> Scene:
+    return Scene(
+        scene_id="sc-1",
+        order=1,
+        title="Opening Scene",
+        source_chapters=["ch-1", "ch-2", "ch-3"],
+        summary="Alice greets.",
+        content_blocks=[_block()],
+        location_name=location_name,
+        key_event_coverage=[
+            SceneKeyEventCoverage(key_event_id=f"ev-{order}", fidelity_status="faithful")
+            for order in (1, 2, 3)
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    "location_name",
+    ["书店后院、店堂", "Cafe, Street", "Cafe，Street", "Cafe/Street"],
+)
+def test_location_name_joining_locations_fails_reference_validation(
+    location_name: str,
+) -> None:
+    scene = _scene_with_location_name(location_name)
+    report = validate_document(_draft(screenplay=Screenplay(scenes=[scene])))
+    assert report.reference_validation_passed is False
+    assert any(error.code == "LOCATION_NAME_NOT_SINGLE" for error in report.errors)
+
+
+def test_single_location_name_passes_reference_validation() -> None:
+    scene = _scene_with_location_name("书店后院阁楼")
+    report = validate_document(_draft(screenplay=Screenplay(scenes=[scene])))
+    assert report.reference_validation_passed is True
+    assert not any(error.code == "LOCATION_NAME_NOT_SINGLE" for error in report.errors)
+
+
+def test_none_location_name_passes_reference_validation() -> None:
+    report = validate_document(_draft())
+    assert not any(error.code == "LOCATION_NAME_NOT_SINGLE" for error in report.errors)

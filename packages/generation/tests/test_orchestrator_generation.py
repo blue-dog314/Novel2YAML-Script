@@ -102,6 +102,21 @@ def test_generate_screenplay_end_to_end() -> None:
     ]
 
 
+def test_metadata_records_requested_model_for_fake_client() -> None:
+    document = _generate(FakeLLMClient())
+
+    assert document.metadata.model == "fake-model"
+
+
+def test_metadata_records_actual_client_model_over_requested() -> None:
+    class ModelNamedFakeClient(FakeLLMClient):
+        model = "provider-configured-model"
+
+    document = _generate(ModelNamedFakeClient())
+
+    assert document.metadata.model == "provider-configured-model"
+
+
 def test_generate_screenplay_is_deterministic_with_fixed_timestamp() -> None:
     first = _generate(FakeLLMClient())
     second = _generate(FakeLLMClient())

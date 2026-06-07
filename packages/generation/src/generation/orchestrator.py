@@ -23,7 +23,7 @@ from .artifacts import GenerationArtifacts
 from .assembly import assemble_screenplay
 from .chapter_summary import summarize_chapters
 from .inputs import ChapterInput
-from .llm import LLMClient
+from .llm import LLMClient, resolve_actual_model
 from .repair import ModelOutputInvalid
 from .scene_planner import plan_scenes
 from .scene_writer import write_scene
@@ -158,7 +158,7 @@ def generate_screenplay_with_artifacts(
         title=title,
         original_author=original_author,
         language=language,
-        model=model,
+        model=resolve_actual_model(llm, model),
         adaptation_config=adaptation_config,
         artifacts=artifacts,
     )
@@ -232,7 +232,7 @@ def regenerate_scene(
         title=title,
         original_author=original_author,
         language=language,
-        model=model,
+        model=resolve_actual_model(llm, model),
         adaptation_config=adaptation_config,
         artifacts=new_artifacts,
     )

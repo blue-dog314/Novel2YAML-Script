@@ -157,6 +157,21 @@ def test_same_speaker_reuses_id() -> None:
     assert getattr(first, "speaker") == getattr(second, "speaker") == "char-alice"
 
 
+def test_slug_colliding_speakers_get_distinct_ids() -> None:
+    document = assemble_screenplay(
+        **_kwargs(scene_contents=[_scene_content("sc-001", "A B"), _scene_content("sc-002", "A-B")])
+    )
+    first = document.screenplay.scenes[0].content_blocks[1]
+    second = document.screenplay.scenes[1].content_blocks[1]
+    first_id = getattr(first, "speaker")
+    second_id = getattr(second, "speaker")
+    # "A B" and "A-B" slugify to the same core but are distinct names.
+    assert first_id == "char-a-b"
+    assert second_id == "char-a-b-2"
+    character_ids = [character.character_id for character in document.characters]
+    assert len(character_ids) == len(set(character_ids))
+
+
 def test_assembled_document_passes_validators() -> None:
     report = validate_document(assemble_screenplay(**_kwargs()))
     assert report.yaml_parse_passed is True

@@ -105,14 +105,18 @@ def _validate_references(document: ScreenplayDraftDocument) -> list[ValidationEr
     scene_ids = [scene.scene_id for scene in document.screenplay.scenes]
     scene_orders = [scene.order for scene in document.screenplay.scenes]
     change_ids = [change.change_id for change in document.adaptation_changes]
-    character_ids = {character.character_id for character in document.characters}
-    location_ids = {location.location_id for location in document.locations}
+    character_id_list = [character.character_id for character in document.characters]
+    location_id_list = [location.location_id for location in document.locations]
+    character_ids = set(character_id_list)
+    location_ids = set(location_id_list)
 
     errors.extend(_duplicate_issues(chapter_ids, "DUPLICATE_CHAPTER_ID", "chapters"))
     errors.extend(_duplicate_issues(chapter_orders, "DUPLICATE_CHAPTER_ORDER", "chapters.order"))
     errors.extend(_duplicate_issues(scene_ids, "DUPLICATE_SCENE_ID", "screenplay.scenes"))
     errors.extend(_duplicate_issues(scene_orders, "DUPLICATE_SCENE_ORDER", "screenplay.scenes.order"))
     errors.extend(_duplicate_issues(change_ids, "DUPLICATE_ADAPTATION_CHANGE_ID", "adaptation_changes"))
+    errors.extend(_duplicate_issues(character_id_list, "DUPLICATE_CHARACTER_ID", "characters"))
+    errors.extend(_duplicate_issues(location_id_list, "DUPLICATE_LOCATION_ID", "locations"))
 
     for chapter_index, chapter in enumerate(document.chapters):
         event_ids = [event.event_id for event in chapter.key_events]

@@ -53,6 +53,7 @@ class _CharacterRegistry:
 
     def __init__(self) -> None:
         self._by_key: dict[str, tuple[str, str]] = {}
+        self._used_ids: set[str] = set()
         self._unnamed_counter = 0
 
     def register(self, name: str) -> str:
@@ -64,8 +65,9 @@ class _CharacterRegistry:
         if not core:
             self._unnamed_counter += 1
             core = f"unnamed-{self._unnamed_counter}"
-        character_id = f"char-{core}"
+        character_id = _unique_id("char", core, self._used_ids)
         self._by_key[key] = (character_id, name.strip())
+        self._used_ids.add(character_id)
         return character_id
 
     def characters(self) -> list[Character]:
@@ -87,6 +89,7 @@ class _LocationRegistry:
 
     def __init__(self) -> None:
         self._by_key: dict[str, tuple[str, str]] = {}
+        self._used_ids: set[str] = set()
         self._unnamed_counter = 0
 
     def register(self, name: str) -> str:
@@ -98,8 +101,9 @@ class _LocationRegistry:
         if not core:
             self._unnamed_counter += 1
             core = f"unnamed-{self._unnamed_counter}"
-        location_id = f"loc-{core}"
+        location_id = _unique_id("loc", core, self._used_ids)
         self._by_key[key] = (location_id, name.strip())
+        self._used_ids.add(location_id)
         return location_id
 
     def locations(self) -> list[Location]:
@@ -190,6 +194,23 @@ def _seq_id(prefix: str, index: int) -> str:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _unique_id(prefix: str, core: str, used_ids: set[str]) -> str:
+    """Return a collision-free ``<prefix>-<core>`` id.
+
+    Distinct display names can slugify to the same core (e.g. ``"A B"`` and
+    ``"A-B"`` both yield ``a-b``). The registries dedup on the casefolded name,
+    so those are different entries that must not share an id. When the base id is
+    already taken by another name, append an incrementing numeric suffix.
+    """
+    candidate = f"{prefix}-{core}"
+    if candidate not in used_ids:
+        return candidate
+    suffix = 2
+    while f"{candidate}-{suffix}" in used_ids:
+        suffix += 1
+    return f"{candidate}-{suffix}"
 
 
 def _slug_core(name: str) -> str:

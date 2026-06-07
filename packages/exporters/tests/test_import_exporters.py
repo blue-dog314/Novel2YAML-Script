@@ -170,6 +170,10 @@ def _draft_with_multiline_text() -> ScreenplayDraftDocument:
                 line="第一句。\n第二句。",
             )
         ],
+        key_event_coverage=[
+            SceneKeyEventCoverage(key_event_id=f"ev-{order}", fidelity_status="faithful")
+            for order in (1, 2, 3)
+        ],
     )
     return _draft(screenplay=Screenplay(scenes=[scene]))
 

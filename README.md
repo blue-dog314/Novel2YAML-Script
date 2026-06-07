@@ -1,5 +1,9 @@
 # Novel2YAML-Script
 
+## 项目演示
+
+- 演示视频：[Bilibili BV1BpEh6YEQ3](https://www.bilibili.com/video/BV1BpEh6YEQ3/)
+
 AI 辅助的「小说 → 结构化剧本 YAML」工具(P0a-lite MVP)。把 3 章以上的小说原文,经过分阶段生成流水线,转换为可编辑、经 Schema 校验的剧本 YAML 草稿。
 
 本仓库是基于 [uv](https://docs.astral.sh/uv/) workspace 的 Python monorepo,内含后端契约层、校验层、生成编排、YAML 导出层,以及一个本地 FastAPI 演示 API 与内嵌的「作者工作台」单页前端。

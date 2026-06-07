@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import json
 from types import TracebackType
 from typing import Any, cast
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
 import pytest
@@ -117,3 +118,62 @@ def test_openai_compatible_client_from_env_reads_configuration(
     assert client.base_url == "https://provider.example/v1"
     assert client.timeout_seconds == 9.5
     assert client.max_retries == 4
+
+
+def _http_error(status: int, body: str) -> HTTPError:
+    return HTTPError(
+        url="https://provider.example/v1/chat/completions",
+        code=status,
+        msg="error",
+        hdrs=None,  # type: ignore[arg-type]
+        fp=io.BytesIO(body.encode("utf-8")),
+    )
+
+
+def test_http_error_message_redacts_sensitive_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    secret_fragment = "BEGIN_UNTRUSTED_SOURCE_TEXT private manuscript line"
+    body = json.dumps(
+        {
+            "error": {
+                "message": secret_fragment,
+                "type": "invalid_request_error",
+                "code": "context_length_exceeded",
+            }
+        }
+    )
+
+    def fake_urlopen(request: Request, timeout: float) -> FakeHTTPResponse:
+        raise _http_error(400, body)
+
+    monkeypatch.setattr("generation.llm.urlopen", fake_urlopen)
+
+    client = OpenAICompatibleLLMClient(api_key="secret", model="test-model", max_retries=0)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        client.complete(system="system", user="user")
+
+    message = str(excinfo.value)
+    assert "HTTP 400" in message
+    assert "type=invalid_request_error" in message
+    assert "code=context_length_exceeded" in message
+    assert secret_fragment not in message
+    assert "manuscript" not in message
+
+
+def test_http_error_message_without_structured_body_is_status_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_urlopen(request: Request, timeout: float) -> FakeHTTPResponse:
+        raise _http_error(500, "raw upstream stacktrace with secret token")
+
+    monkeypatch.setattr("generation.llm.urlopen", fake_urlopen)
+    monkeypatch.setattr("generation.llm.sleep", lambda seconds: None)
+
+    client = OpenAICompatibleLLMClient(api_key="secret", model="test-model", max_retries=0)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        client.complete(system="system", user="user")
+
+    message = str(excinfo.value)
+    assert message == "LLM provider returned HTTP 500."
+    assert "secret token" not in message

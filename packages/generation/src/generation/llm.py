@@ -425,9 +425,14 @@ def _extract_completion_content(payload: dict[str, Any]) -> str:
 
 
 def _http_error_message(exc: HTTPError) -> str:
+    # The raw provider error body may echo request fragments (source text) or
+    # sensitive diagnostics. This message surfaces through PipelineError to the
+    # API, so only expose a safe summary: the status code plus structured
+    # error type/code enums, never the free-form body text.
     body = _read_http_error_body(exc)
-    if body:
-        return f"LLM provider returned HTTP {exc.code}: {body}"
+    summary = _safe_error_summary(body)
+    if summary:
+        return f"LLM provider returned HTTP {exc.code} ({summary})."
     return f"LLM provider returned HTTP {exc.code}."
 
 
@@ -436,6 +441,31 @@ def _read_http_error_body(exc: HTTPError) -> str:
         return exc.read().decode("utf-8", errors="replace")
     except Exception:
         return ""
+
+
+def _safe_error_summary(body: str) -> str:
+    """Extract only enum-like type/code fields from an OpenAI-compatible error body.
+
+    Returns an empty string when the body is not structured, so the caller falls
+    back to status-code-only. Free-form ``message`` text is intentionally dropped
+    to avoid leaking request fragments or sensitive provider diagnostics.
+    """
+    if not body:
+        return ""
+    try:
+        loaded = json.loads(body)
+    except (ValueError, TypeError):
+        return ""
+    if not isinstance(loaded, dict):
+        return ""
+    error = loaded.get("error")
+    error_obj = error if isinstance(error, dict) else loaded
+    parts: list[str] = []
+    for field in ("type", "code"):
+        value = error_obj.get(field)
+        if isinstance(value, (str, int)) and str(value).strip():
+            parts.append(f"{field}={str(value).strip()[:64]}")
+    return ", ".join(parts)
 
 
 def _should_retry_http(status_code: int) -> bool:

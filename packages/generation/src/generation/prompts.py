@@ -47,6 +47,17 @@ def build_chapter_summary_prompt(chapter: ChapterInput) -> tuple[str, str]:
                 "Create one ChapterSummaryOutput JSON object for this chapter.",
                 "key_events must contain at least one concrete event from the chapter.",
                 (
+                    "summary must preserve the concrete, adaptable detail of the "
+                    "chapter (who does what, where, and why it matters), not a "
+                    "one-line gist; keep the specifics a screenwriter needs to "
+                    "build scenes."
+                ),
+                (
+                    "key_events must list every distinct turning point in the "
+                    "chapter as its own entry, each a concrete action or decision "
+                    "rather than an abstract theme."
+                ),
+                (
                     "Each characters_mentioned entry must be a single clean proper "
                     "name with no parenthetical notes or status suffixes (for example "
                     "no '(mentioned)', '(vision/memory)', or '(recollection)')."
@@ -128,7 +139,20 @@ def build_scene_content_prompt(
             [
                 "Create one SceneContentOutput JSON object for this planned scene.",
                 "Use the provided scene_id exactly.",
-                "content_blocks must include at least one action or dialogue block.",
+                (
+                    "Expand the plan_item (dramatic_goal, conflict, summary) into "
+                    "performable content: stage what characters concretely do and "
+                    "say. Do not restate the plan or summarize the plot."
+                ),
+                (
+                    "content_blocks must contain at least four blocks, including "
+                    "at least one action block and at least two dialogue blocks "
+                    "that advance the scene's conflict."
+                ),
+                (
+                    "Action blocks describe visible, filmable behavior; dialogue "
+                    "lines are spoken words, never narration about what happens."
+                ),
                 (
                     "For every key_event listed in the input, add a covered_key_events "
                     "entry citing its event_id, the fidelity_status, and the 1-based "

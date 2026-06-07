@@ -395,3 +395,28 @@ def test_scene_content_prompt_constrains_clean_speaker_name() -> None:
         "Each dialogue block's speaker_name must be a single clean proper "
         "name with no parenthetical notes or status suffixes" in user
     )
+
+
+def test_chapter_summary_prompt_requires_content_density() -> None:
+    _, user = build_chapter_summary_prompt(
+        ChapterInput(chapter_id="ch-1", title="Chapter 1", text="Source.")
+    )
+
+    assert "not a one-line gist" in user
+    assert "every distinct turning point" in user
+
+
+def test_scene_content_prompt_requires_performable_richness() -> None:
+    from shared_types import ScenePlanItem
+
+    plan_item = ScenePlanItem(
+        title="Opening",
+        source_chapters=["ch-1"],
+        summary="The protagonist confronts the antagonist.",
+    )
+    _, user = build_scene_content_prompt(scene_id="sc-001", plan_item=plan_item)
+
+    assert "Expand the plan_item" in user
+    assert "Do not restate the plan or summarize the plot." in user
+    assert "at least four blocks" in user
+    assert "at least two dialogue blocks" in user

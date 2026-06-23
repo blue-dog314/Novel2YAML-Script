@@ -2,7 +2,7 @@
 
 ## 项目演示
 
-- 演示视频：[Bilibili BV1BpEh6YEQ3](https://www.bilibili.com/video/BV1BpEh6YEQ3/)
+- 演示视频：[百度网盘](https://pan.baidu.com/s/1haPiDoeprMYzso8x9aM3cg?pwd=2ntm) 提取码：2ntm
 
 AI 辅助的「小说 → 结构化剧本 YAML」工具(P0a-lite MVP)。把 3 章以上的小说原文,经过分阶段生成流水线,转换为可编辑、经 Schema 校验的剧本 YAML 草稿。
 
